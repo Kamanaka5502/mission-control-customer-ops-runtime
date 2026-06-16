@@ -1,0 +1,16 @@
+{
+  "customer_id": "demo-customer",
+  "workflow_id": "security-exception",
+  "request_id": "REQ-ESCALATE-001",
+  "requested_action": "approve_security_exception",
+  "business_context": "Exception touches a critical system and requires higher authority.",
+  "authority_present": true,
+  "scope_matched": true,
+  "evidence_present": true,
+  "evidence_fresh": true,
+  "risk_level": "critical",
+  "approval_required": true,
+  "metadata": {
+    "department": "security"
+  }
+}
