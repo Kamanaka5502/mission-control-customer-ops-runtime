@@ -1,0 +1,16 @@
+{
+  "customer_id": "demo-customer",
+  "workflow_id": "vendor-onboarding",
+  "request_id": "REQ-HOLD-001",
+  "requested_action": "review_vendor_current_evidence_before_approval",
+  "business_context": "Vendor request is in scope but evidence package requires refresh before approval.",
+  "authority_present": true,
+  "scope_matched": true,
+  "evidence_present": true,
+  "evidence_fresh": false,
+  "risk_level": "medium",
+  "approval_required": false,
+  "metadata": {
+    "department": "procurement"
+  }
+}
