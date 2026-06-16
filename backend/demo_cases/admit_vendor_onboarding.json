@@ -1,0 +1,16 @@
+{
+  "customer_id": "demo-customer",
+  "workflow_id": "vendor-onboarding",
+  "request_id": "REQ-ADMIT-001",
+  "requested_action": "approve_vendor_for_low_risk_service",
+  "business_context": "Vendor passed intake, scope is limited, evidence is fresh, approval already granted.",
+  "authority_present": true,
+  "scope_matched": true,
+  "evidence_present": true,
+  "evidence_fresh": true,
+  "risk_level": "low",
+  "approval_required": false,
+  "metadata": {
+    "department": "operations"
+  }
+}
