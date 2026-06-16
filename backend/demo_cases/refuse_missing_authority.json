@@ -1,0 +1,16 @@
+{
+  "customer_id": "demo-customer",
+  "workflow_id": "payment-release",
+  "request_id": "REQ-REFUSE-001",
+  "requested_action": "release_payment",
+  "business_context": "Payment request lacks required authority.",
+  "authority_present": false,
+  "scope_matched": true,
+  "evidence_present": true,
+  "evidence_fresh": true,
+  "risk_level": "high",
+  "approval_required": true,
+  "metadata": {
+    "department": "finance"
+  }
+}
