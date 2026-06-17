@@ -140,6 +140,10 @@ def execute_request(
     if not decision:
         raise HTTPException(status_code=404, detail="Decision not found")
 
+    if decision.outcome == "REFUSE":
+        record_event(db, request_id, "execution_blocked", actor=role.value, detail={"status": operation.lifecycle_status, "outcome": decision.outcome})
+        raise HTTPException(status_code=409, detail={"execution_status": "BLOCKED", "reason": "Closed request is not releasable."})
+
     allowed_statuses = {"ready_to_execute", "approved_for_execution"}
     if operation.lifecycle_status not in allowed_statuses:
         record_event(db, request_id, "execution_blocked", actor=role.value, detail={"status": operation.lifecycle_status, "outcome": decision.outcome})
@@ -296,6 +300,13 @@ def review_request(
     require_role(role, {Role.ADMIN, Role.REVIEWER})
 
     req = get_request_for_tenant(db, request_id, tenant_id)
+    decision = db.query(Decision).filter(Decision.request_id == request_id).first()
+    if not decision:
+        raise HTTPException(status_code=404, detail="Decision not found")
+
+    if payload.decision == "approve" and decision.outcome == "REFUSE":
+        record_event(db, request_id, "review_blocked", actor=payload.actor or role.value, detail={"decision": payload.decision, "outcome": decision.outcome})
+        raise HTTPException(status_code=409, detail={"review_status": "BLOCKED", "reason": "Closed request is not approvable."})
 
     next_status = {
         "approve": "approved_for_execution",
