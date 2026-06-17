@@ -9,6 +9,7 @@ Backend:
 ```bash
 cd backend
 python -m pip install -r requirements.txt
+python -m alembic upgrade head
 PYTHONPATH=. python -m pytest -q
 ```
 
@@ -39,6 +40,20 @@ docker compose -f docker-compose.prod.yml up --build
 
 Run the API behind authenticated ingress. Production requests must include verified ingress identity, actor role, and tenant id after authentication and tenant resolution.
 
+## Schema versioning
+
+Apply the current schema revision from the backend directory:
+
+```bash
+python -m alembic upgrade head
+```
+
+Runtime schema state is available at:
+
+```text
+GET /schema-version
+```
+
 ## Health checks
 
 Liveness:
@@ -59,6 +74,7 @@ curl http://localhost:8000/ready
 
 Before external deployment, verify:
 
+- backend migrations apply cleanly
 - backend tests pass
 - frontend build passes
 - production env vars are set
