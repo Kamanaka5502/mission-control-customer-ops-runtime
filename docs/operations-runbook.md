@@ -33,10 +33,11 @@ Use the production compose profile only with required environment variables supp
 ```bash
 POSTGRES_PASSWORD=<strong value> \
 NEXT_PUBLIC_API_BASE=https://api.example.com \
+CORS_ALLOW_ORIGINS=https://app.example.com \
 docker compose -f docker-compose.prod.yml up --build
 ```
 
-The API should run behind authenticated ingress. Production requests must include verified ingress identity, actor role, and tenant id after the ingress layer resolves authentication and tenant membership.
+Run the API behind authenticated ingress. Production requests must include verified ingress identity, actor role, and tenant id after authentication and tenant resolution.
 
 ## Health checks
 
@@ -61,9 +62,9 @@ Before external deployment, verify:
 - backend tests pass
 - frontend build passes
 - production env vars are set
-- API is not directly public
-- ingress injects verified identity only after authentication
+- API is behind authenticated ingress
 - tenant id is resolved upstream
+- CORS origins are explicitly listed for the deployed frontend
 - logs preserve correlation ids
 - closed/REFUSE requests cannot release protected action
 - dependency update alerts are enabled
