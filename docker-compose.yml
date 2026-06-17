@@ -5,3 +5,13 @@ services:
       - "8000:8000"
     environment:
       - APP_MODE=customer-operations-platform
+      - DATABASE_URL=sqlite:///./mission_control.db
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_BASE=http://localhost:8000
+    depends_on:
+      - api
