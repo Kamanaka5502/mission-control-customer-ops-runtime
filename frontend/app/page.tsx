@@ -51,6 +51,7 @@ export default function Page() {
   const [decision, setDecision] = useState<Decision | null>(null);
   const [receipt, setReceipt] = useState<object | null>(null);
   const [replay, setReplay] = useState<object | null>(null);
+  const [audit, setAudit] = useState<object | null>(null);
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({
     customer_id: "demo-customer",
@@ -97,6 +98,7 @@ export default function Page() {
     setLoading(true);
     setReceipt(null);
     setReplay(null);
+    setAudit(null);
     try {
       const res = await fetch(`${API_BASE}/ops/requests/evaluate`, {
         method: "POST",
@@ -105,6 +107,7 @@ export default function Page() {
       });
       const data = await res.json();
       setDecision(data);
+      setForm(prev => ({ ...prev, request_id: `REQ-${Date.now()}` }));
       await refreshDashboard();
     } finally {
       setLoading(false);
@@ -119,18 +122,25 @@ export default function Page() {
       body: JSON.stringify({ actor: "ops-reviewer", decision: decisionType, notes: `Dashboard review: ${decisionType}` })
     });
     await refreshDashboard();
+    await loadAudit();
   }
 
   async function loadReceipt() {
     if (!decision) return;
-    const res = await fetch(`${API_BASE}/requests/${decision.request_id}/receipt`);
+    const res = await fetch(`${API_BASE}/ops/requests/${decision.request_id}/receipt`);
     if (res.ok) setReceipt(await res.json());
   }
 
   async function runReplay(type: "same-condition" | "changed-condition") {
     if (!decision) return;
-    const res = await fetch(`${API_BASE}/replay/${decision.request_id}/${type}`, { method: "POST" });
+    const res = await fetch(`${API_BASE}/ops/requests/${decision.request_id}/replay/${type}`, { method: "POST" });
     if (res.ok) setReplay(await res.json());
+  }
+
+  async function loadAudit() {
+    if (!decision) return;
+    const res = await fetch(`${API_BASE}/ops/requests/${decision.request_id}/audit`);
+    if (res.ok) setAudit(await res.json());
   }
 
   const outcomeClass = useMemo(() => decision?.outcome.toLowerCase() || "hold", [decision]);
@@ -143,7 +153,7 @@ export default function Page() {
           <h1>Mission Control Runtime</h1>
           <p className="subtitle">
             A working customer operations platform for workflow intake, evidence checks, review routing,
-            governed execution status, receipts, replay, and operational visibility.
+            governed execution status, receipts, replay, audit trail, and operational visibility.
           </p>
         </div>
         <button className="button" onClick={seedDemo}>Seed Demo Customer</button>
@@ -175,7 +185,7 @@ export default function Page() {
               <Check label="Scope matched" checked={form.scope_matched} onChange={v => setForm({ ...form, scope_matched: v })} />
               <Check label="Evidence present" checked={form.evidence_present} onChange={v => setForm({ ...form, evidence_present: v })} />
               <Check label="Evidence fresh" checked={form.evidence_fresh} onChange={v => setForm({ ...form, evidence_fresh: v })} />
-              <Check label="Approval required" checked={form.approval_required} onChange={v => setForm({ ...form, approval_required: v })} />
+              <Check label="Review required" checked={form.approval_required} onChange={v => setForm({ ...form, approval_required: v })} />
             </div>
             <button className="button" onClick={submitRequest} disabled={loading}>{loading ? "Evaluating..." : "Evaluate Request"}</button>
           </div>
@@ -200,6 +210,7 @@ export default function Page() {
                 <button className="button" onClick={loadReceipt}>Load Receipt</button>
                 <button className="button" onClick={() => runReplay("same-condition")}>Same Replay</button>
                 <button className="button" onClick={() => runReplay("changed-condition")}>Changed Replay</button>
+                <button className="button" onClick={loadAudit}>Audit Trail</button>
               </div>
             </>
           ) : <p className="subtitle">Submit a customer request to see the runtime decision.</p>}
@@ -224,8 +235,8 @@ export default function Page() {
           </table>
         </div>
         <div className="card">
-          <div className="panel-title"><h2>Receipt / Replay Output</h2></div>
-          <div className="receipt">{JSON.stringify(replay || receipt || { status: "No receipt or replay loaded yet." }, null, 2)}</div>
+          <div className="panel-title"><h2>Receipt / Replay / Audit Output</h2></div>
+          <div className="receipt">{JSON.stringify(audit || replay || receipt || { status: "No receipt, replay, or audit trail loaded yet." }, null, 2)}</div>
         </div>
       </section>
     </main>
