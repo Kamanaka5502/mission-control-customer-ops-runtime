@@ -1,3 +1,4 @@
+import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.database import init_db
@@ -10,19 +11,27 @@ from app.routes.operations import router as operations_router
 from app.routes.metrics import router as metrics_router
 from app.routes.jobs import router as jobs_router
 
+
+def cors_origins() -> list[str]:
+    raw = os.getenv("CORS_ALLOW_ORIGINS")
+    if not raw:
+        return ["http://localhost:3000", "http://127.0.0.1:3000"]
+    return [origin.strip() for origin in raw.split(",") if origin.strip()]
+
+
 app = FastAPI(
     title="Mission Control: Customer Operations Runtime",
-    version="0.4.0",
-    description="Customer operations runtime with intake, persistence, review gates, controlled execution, receipts, replay, audit, metrics, and dashboard APIs."
+    version="0.5.0",
+    description="Customer operations runtime with intake, persistence, review gates, controlled execution, receipts, replay, audit, metrics, dashboard APIs, and production-boundary controls."
 )
 
 app.add_middleware(CorrelationIdMiddleware)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origins=cors_origins(),
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["authorization", "content-type", "x-actor-role", "x-tenant-id", "x-ingress-verified", "x-correlation-id"],
 )
 
 
