@@ -1,7 +1,5 @@
 FROM node:22-alpine
 
-ENV NODE_ENV=production
-
 WORKDIR /app
 
 RUN addgroup -S app && adduser -S app -G app
@@ -11,6 +9,8 @@ RUN npm ci
 
 COPY . .
 RUN npm run build
+
+ENV NODE_ENV=production
 
 USER app
 
