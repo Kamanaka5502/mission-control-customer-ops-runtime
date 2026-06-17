@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.db_models import Decision, ExecutionJob
+from app.db_models import Decision, ExecutionJob, OperationRequest
 from app.services.audit import record_event
 from app.services.rbac import Role, get_actor_role, require_role
 from app.services.tenant_guard import get_tenant_id, get_request_for_tenant
@@ -23,6 +23,14 @@ def job_to_dict(job: ExecutionJob):
         "started_at": job.started_at.isoformat() if job.started_at else None,
         "completed_at": job.completed_at.isoformat() if job.completed_at else None,
     }
+
+
+def get_job_for_tenant(db: Session, job_id: str, tenant_id: str | None) -> ExecutionJob:
+    job = db.get(ExecutionJob, job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Execution job not found")
+    get_request_for_tenant(db, job.request_id, tenant_id)
+    return job
 
 
 @router.post("/jobs/{request_id}/queue")
@@ -83,7 +91,10 @@ def list_execution_jobs(
     tenant_id: str | None = Depends(get_tenant_id),
 ):
     require_role(role, {Role.ADMIN, Role.REVIEWER, Role.OPERATOR, Role.AUDITOR})
-    jobs = db.query(ExecutionJob).order_by(ExecutionJob.created_at.desc()).all()
+    query = db.query(ExecutionJob).join(OperationRequest, ExecutionJob.request_id == OperationRequest.id)
+    if tenant_id:
+        query = query.filter(OperationRequest.customer_id == tenant_id)
+    jobs = query.order_by(ExecutionJob.created_at.desc()).all()
     return [job_to_dict(job) for job in jobs]
 
 
@@ -92,12 +103,10 @@ def get_execution_job(
     job_id: str,
     db: Session = Depends(get_db),
     role: Role = Depends(get_actor_role),
+    tenant_id: str | None = Depends(get_tenant_id),
 ):
     require_role(role, {Role.ADMIN, Role.REVIEWER, Role.OPERATOR, Role.AUDITOR})
-
-    job = db.get(ExecutionJob, job_id)
-    if not job:
-        raise HTTPException(status_code=404, detail="Execution job not found")
+    job = get_job_for_tenant(db, job_id, tenant_id)
     return job_to_dict(job)
 
 
@@ -107,12 +116,11 @@ def claim_execution_job(
     worker_id: str = "worker-local",
     db: Session = Depends(get_db),
     role: Role = Depends(get_actor_role),
+    tenant_id: str | None = Depends(get_tenant_id),
 ):
     require_role(role, {Role.ADMIN, Role.OPERATOR})
 
-    job = db.get(ExecutionJob, job_id)
-    if not job:
-        raise HTTPException(status_code=404, detail="Execution job not found")
+    job = get_job_for_tenant(db, job_id, tenant_id)
     if job.status != "QUEUED":
         raise HTTPException(status_code=409, detail="Only QUEUED jobs can be claimed")
 
@@ -129,16 +137,15 @@ def complete_execution_job(
     job_id: str,
     db: Session = Depends(get_db),
     role: Role = Depends(get_actor_role),
+    tenant_id: str | None = Depends(get_tenant_id),
 ):
     require_role(role, {Role.ADMIN, Role.OPERATOR})
 
-    job = db.get(ExecutionJob, job_id)
-    if not job:
-        raise HTTPException(status_code=404, detail="Execution job not found")
+    job = get_job_for_tenant(db, job_id, tenant_id)
     if job.status != "RUNNING":
         raise HTTPException(status_code=409, detail="Only RUNNING jobs can be completed")
 
-    operation = get_request_for_tenant(db, job.request_id, None)
+    operation = get_request_for_tenant(db, job.request_id, tenant_id)
     job.status = "COMPLETED"
     job.completed_at = datetime.utcnow()
     operation.lifecycle_status = "executed"
@@ -153,12 +160,11 @@ def fail_execution_job(
     failure_reason: str = "Execution failed",
     db: Session = Depends(get_db),
     role: Role = Depends(get_actor_role),
+    tenant_id: str | None = Depends(get_tenant_id),
 ):
     require_role(role, {Role.ADMIN, Role.OPERATOR})
 
-    job = db.get(ExecutionJob, job_id)
-    if not job:
-        raise HTTPException(status_code=404, detail="Execution job not found")
+    job = get_job_for_tenant(db, job_id, tenant_id)
     if job.status not in {"QUEUED", "RUNNING"}:
         raise HTTPException(status_code=409, detail="Only QUEUED or RUNNING jobs can fail")
 
