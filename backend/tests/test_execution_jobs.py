@@ -44,11 +44,11 @@ def test_queue_claim_complete_job():
 
     job_id = queued.json()["id"]
 
-    running = client.post(f"/ops/jobs/{job_id}/claim", headers={"x-actor-role": "operator"})
+    running = client.post(f"/ops/jobs/{job_id}/claim", headers={"x-actor-role": "operator", "x-tenant-id": tenant_id})
     assert running.status_code == 200
     assert running.json()["status"] == "RUNNING"
 
-    completed = client.post(f"/ops/jobs/{job_id}/complete", headers={"x-actor-role": "operator"})
+    completed = client.post(f"/ops/jobs/{job_id}/complete", headers={"x-actor-role": "operator", "x-tenant-id": tenant_id})
     assert completed.status_code == 200
     assert completed.json()["status"] == "COMPLETED"
 
@@ -59,7 +59,7 @@ def test_fail_job():
     queued = client.post(f"/ops/jobs/{request_id}/queue", headers={"x-actor-role": "operator", "x-tenant-id": tenant_id})
     job_id = queued.json()["id"]
 
-    failed = client.post(f"/ops/jobs/{job_id}/fail?failure_reason=worker_error", headers={"x-actor-role": "operator"})
+    failed = client.post(f"/ops/jobs/{job_id}/fail?failure_reason=worker_error", headers={"x-actor-role": "operator", "x-tenant-id": tenant_id})
     assert failed.status_code == 200
     assert failed.json()["status"] == "FAILED"
     assert failed.json()["failure_reason"] == "worker_error"
@@ -70,3 +70,18 @@ def test_auditor_cannot_queue_job():
 
     response = client.post(f"/ops/jobs/{request_id}/queue", headers={"x-actor-role": "auditor", "x-tenant-id": tenant_id})
     assert response.status_code == 403
+
+
+def test_other_tenant_cannot_read_or_claim_job():
+    request_id, tenant_id = make_executable_request()
+    other_tenant = f"other-{tenant_id}"
+
+    queued = client.post(f"/ops/jobs/{request_id}/queue", headers={"x-actor-role": "operator", "x-tenant-id": tenant_id})
+    assert queued.status_code == 200
+    job_id = queued.json()["id"]
+
+    read = client.get(f"/ops/jobs/{job_id}", headers={"x-actor-role": "auditor", "x-tenant-id": other_tenant})
+    assert read.status_code == 403
+
+    claim = client.post(f"/ops/jobs/{job_id}/claim", headers={"x-actor-role": "operator", "x-tenant-id": other_tenant})
+    assert claim.status_code == 403
