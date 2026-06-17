@@ -94,3 +94,16 @@ class AuditEvent(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     request: Mapped[OperationRequest] = relationship(back_populates="audit_events")
+
+
+class ExecutionJob(Base):
+    __tablename__ = "execution_jobs"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    request_id: Mapped[str] = mapped_column(ForeignKey("operation_requests.id"), nullable=False)
+    status: Mapped[str] = mapped_column(String, default="QUEUED")
+    worker_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    failure_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
