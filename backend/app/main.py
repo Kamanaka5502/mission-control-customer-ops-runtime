@@ -8,6 +8,7 @@ from app.routes.health import router as health_router
 from app.routes.customers import router as customers_router
 from app.routes.operations import router as operations_router
 from app.routes.metrics import router as metrics_router
+from app.routes.jobs import router as jobs_router
 
 app = FastAPI(
     title="Mission Control: Customer Operations Runtime",
@@ -34,5 +35,6 @@ app.include_router(health_router, tags=["health"])
 app.include_router(metrics_router, tags=["metrics"])
 app.include_router(customers_router, prefix="/ops", tags=["customers-workflows"])
 app.include_router(operations_router, prefix="/ops", tags=["operations"])
+app.include_router(jobs_router, prefix="/ops", tags=["execution-jobs"])
 app.include_router(requests_router, prefix="/requests", tags=["legacy-demo-requests"])
 app.include_router(replay_router, prefix="/replay", tags=["legacy-demo-replay"])
