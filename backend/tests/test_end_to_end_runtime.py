@@ -32,30 +32,53 @@ def test_end_to_end_customer_operations_path():
         "metadata": {"test": True}
     }
 
-    decision = client.post("/ops/requests/evaluate", json=payload)
+    decision = client.post(
+        "/ops/requests/evaluate",
+        headers={"x-actor-role": "operator"},
+        json=payload,
+    )
     assert decision.status_code == 200
     assert decision.json()["outcome"] == "ADMIT"
 
-    review = client.post(f"/ops/requests/{request_id}/review", json={"actor": "tester", "decision": "approve", "notes": "ok"})
+    review = client.post(
+        f"/ops/requests/{request_id}/review",
+        headers={"x-actor-role": "reviewer"},
+        json={"actor": "tester", "decision": "approve", "notes": "ok"},
+    )
     assert review.status_code == 200
     assert review.json()["lifecycle_status"] == "approved_for_execution"
 
-    receipt = client.get(f"/ops/requests/{request_id}/receipt")
+    receipt = client.get(
+        f"/ops/requests/{request_id}/receipt",
+        headers={"x-actor-role": "auditor"},
+    )
     assert receipt.status_code == 200
     assert receipt.json()["receipt_id"] == f"receipt-{request_id}"
 
-    same = client.post(f"/ops/requests/{request_id}/replay/same-condition")
+    same = client.post(
+        f"/ops/requests/{request_id}/replay/same-condition",
+        headers={"x-actor-role": "auditor"},
+    )
     assert same.status_code == 200
     assert same.json()["matched"] is True
 
-    changed = client.post(f"/ops/requests/{request_id}/replay/changed-condition")
+    changed = client.post(
+        f"/ops/requests/{request_id}/replay/changed-condition",
+        headers={"x-actor-role": "auditor"},
+    )
     assert changed.status_code == 200
     assert changed.json()["no_bind_status"] is True
 
-    audit = client.get(f"/ops/requests/{request_id}/audit")
+    audit = client.get(
+        f"/ops/requests/{request_id}/audit",
+        headers={"x-actor-role": "auditor"},
+    )
     assert audit.status_code == 200
     assert len(audit.json()) >= 4
 
-    dashboard = client.get("/ops/dashboard")
+    dashboard = client.get(
+        "/ops/dashboard",
+        headers={"x-actor-role": "auditor"},
+    )
     assert dashboard.status_code == 200
     assert dashboard.json()["total_requests"] >= 1

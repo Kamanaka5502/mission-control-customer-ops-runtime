@@ -7,6 +7,7 @@ from app.schemas import RequestCreate, EvidenceCreate, ReviewAction, OperationsD
 from app.services.policy_gate import evaluate_request
 from app.services.receipt import build_receipt
 from app.services.audit import record_event
+from app.services.rbac import Role, get_actor_role, require_role
 
 router = APIRouter()
 
@@ -29,7 +30,13 @@ def operation_to_customer_request(operation: OperationRequest) -> CustomerReques
 
 
 @router.post("/requests/evaluate", response_model=RuntimeDecision)
-def create_and_evaluate_request(payload: RequestCreate, db: Session = Depends(get_db)):
+def create_and_evaluate_request(
+    payload: RequestCreate,
+    db: Session = Depends(get_db),
+    role: Role = Depends(get_actor_role),
+):
+    require_role(role, {Role.ADMIN, Role.OPERATOR})
+
     workflow = db.get(Workflow, payload.workflow_id)
     if not workflow:
         raise HTTPException(status_code=404, detail="Workflow not found")
@@ -64,6 +71,7 @@ def create_and_evaluate_request(payload: RequestCreate, db: Session = Depends(ge
         lifecycle_status=lifecycle_status,
         request_metadata=payload.metadata,
     )
+
     decision = Decision(
         id=f"decision-{payload.request_id}",
         request_id=payload.request_id,
@@ -78,7 +86,7 @@ def create_and_evaluate_request(payload: RequestCreate, db: Session = Depends(ge
     db.add(operation)
     db.add(decision)
     db.commit()
-    record_event(db, payload.request_id, "request_evaluated", detail={"outcome": outcome.value, "status": lifecycle_status})
+    record_event(db, payload.request_id, "request_evaluated", actor=role.value, detail={"outcome": outcome.value, "status": lifecycle_status})
 
     return RuntimeDecision(
         request_id=payload.request_id,
@@ -94,12 +102,14 @@ def create_and_evaluate_request(payload: RequestCreate, db: Session = Depends(ge
 
 
 @router.get("/requests")
-def list_requests(db: Session = Depends(get_db)):
+def list_requests(db: Session = Depends(get_db), role: Role = Depends(get_actor_role)):
+    require_role(role, {Role.ADMIN, Role.REVIEWER, Role.OPERATOR, Role.AUDITOR})
     return db.query(OperationRequest).order_by(OperationRequest.created_at.desc()).all()
 
 
 @router.get("/requests/{request_id}")
-def get_request(request_id: str, db: Session = Depends(get_db)):
+def get_request(request_id: str, db: Session = Depends(get_db), role: Role = Depends(get_actor_role)):
+    require_role(role, {Role.ADMIN, Role.REVIEWER, Role.OPERATOR, Role.AUDITOR})
     req = db.get(OperationRequest, request_id)
     if not req:
         raise HTTPException(status_code=404, detail="Request not found")
@@ -107,7 +117,9 @@ def get_request(request_id: str, db: Session = Depends(get_db)):
 
 
 @router.post("/requests/{request_id}/execute")
-def execute_request(request_id: str, db: Session = Depends(get_db)):
+def execute_request(request_id: str, db: Session = Depends(get_db), role: Role = Depends(get_actor_role)):
+    require_role(role, {Role.ADMIN, Role.OPERATOR})
+
     operation = db.get(OperationRequest, request_id)
     if not operation:
         raise HTTPException(status_code=404, detail="Request not found")
@@ -118,16 +130,16 @@ def execute_request(request_id: str, db: Session = Depends(get_db)):
 
     allowed_statuses = {"ready_to_execute", "approved_for_execution"}
     if operation.lifecycle_status not in allowed_statuses:
-        record_event(db, request_id, "execution_blocked", detail={"status": operation.lifecycle_status, "outcome": decision.outcome})
+        record_event(db, request_id, "execution_blocked", actor=role.value, detail={"status": operation.lifecycle_status, "outcome": decision.outcome})
         raise HTTPException(status_code=409, detail={"execution_status": "BLOCKED", "reason": "Request is not in an executable lifecycle state."})
 
     if decision.outcome != "ADMIT" and operation.lifecycle_status != "approved_for_execution":
-        record_event(db, request_id, "execution_blocked", detail={"status": operation.lifecycle_status, "outcome": decision.outcome})
+        record_event(db, request_id, "execution_blocked", actor=role.value, detail={"status": operation.lifecycle_status, "outcome": decision.outcome})
         raise HTTPException(status_code=409, detail={"execution_status": "BLOCKED", "reason": "Runtime decision is not executable without review approval."})
 
     operation.lifecycle_status = "executed"
     db.commit()
-    record_event(db, request_id, "execution_completed", detail={"requested_action": operation.requested_action})
+    record_event(db, request_id, "execution_completed", actor=role.value, detail={"requested_action": operation.requested_action})
     return {
         "request_id": request_id,
         "execution_status": "EXECUTED",
@@ -137,10 +149,13 @@ def execute_request(request_id: str, db: Session = Depends(get_db)):
 
 
 @router.get("/requests/{request_id}/receipt")
-def persisted_receipt(request_id: str, db: Session = Depends(get_db)):
+def persisted_receipt(request_id: str, db: Session = Depends(get_db), role: Role = Depends(get_actor_role)):
+    require_role(role, {Role.ADMIN, Role.REVIEWER, Role.OPERATOR, Role.AUDITOR})
+
     operation = db.get(OperationRequest, request_id)
     if not operation:
         raise HTTPException(status_code=404, detail="Request not found")
+
     decision = db.query(Decision).filter(Decision.request_id == request_id).first()
     if not decision:
         raise HTTPException(status_code=404, detail="Decision not found")
@@ -153,22 +168,25 @@ def persisted_receipt(request_id: str, db: Session = Depends(get_db)):
         decision.no_bind_status,
         decision.reason_codes,
     )
-    record_event(db, request_id, "receipt_viewed", detail={"receipt_id": receipt.receipt_id})
+    record_event(db, request_id, "receipt_viewed", actor=role.value, detail={"receipt_id": receipt.receipt_id})
     return receipt
 
 
 @router.post("/requests/{request_id}/replay/same-condition")
-def persisted_same_condition_replay(request_id: str, db: Session = Depends(get_db)):
+def persisted_same_condition_replay(request_id: str, db: Session = Depends(get_db), role: Role = Depends(get_actor_role)):
+    require_role(role, {Role.ADMIN, Role.REVIEWER, Role.OPERATOR, Role.AUDITOR})
+
     operation = db.get(OperationRequest, request_id)
     if not operation:
         raise HTTPException(status_code=404, detail="Request not found")
+
     prior = db.query(Decision).filter(Decision.request_id == request_id).first()
     if not prior:
         raise HTTPException(status_code=404, detail="Decision not found")
 
     req_model = operation_to_customer_request(operation)
     outcome, effect_status, no_bind, reason_codes = evaluate_request(req_model)
-    record_event(db, request_id, "same_condition_replay", detail={"observed_outcome": outcome.value})
+    record_event(db, request_id, "same_condition_replay", actor=role.value, detail={"observed_outcome": outcome.value})
     return {
         "request_id": request_id,
         "replay_type": "same_condition",
@@ -182,7 +200,9 @@ def persisted_same_condition_replay(request_id: str, db: Session = Depends(get_d
 
 
 @router.post("/requests/{request_id}/replay/changed-condition")
-def persisted_changed_condition_replay(request_id: str, db: Session = Depends(get_db)):
+def persisted_changed_condition_replay(request_id: str, db: Session = Depends(get_db), role: Role = Depends(get_actor_role)):
+    require_role(role, {Role.ADMIN, Role.REVIEWER, Role.OPERATOR, Role.AUDITOR})
+
     operation = db.get(OperationRequest, request_id)
     if not operation:
         raise HTTPException(status_code=404, detail="Request not found")
@@ -191,8 +211,9 @@ def persisted_changed_condition_replay(request_id: str, db: Session = Depends(ge
     changed.authority_present = False
     changed.evidence_fresh = False
     changed.risk_level = "high"
+
     outcome, effect_status, no_bind, reason_codes = evaluate_request(changed)
-    record_event(db, request_id, "changed_condition_replay", detail={"observed_outcome": outcome.value})
+    record_event(db, request_id, "changed_condition_replay", actor=role.value, detail={"observed_outcome": outcome.value})
     return {
         "request_id": request_id,
         "replay_type": "changed_condition",
@@ -206,18 +227,24 @@ def persisted_changed_condition_replay(request_id: str, db: Session = Depends(ge
 
 
 @router.get("/requests/{request_id}/audit")
-def request_audit_trail(request_id: str, db: Session = Depends(get_db)):
+def request_audit_trail(request_id: str, db: Session = Depends(get_db), role: Role = Depends(get_actor_role)):
+    require_role(role, {Role.ADMIN, Role.REVIEWER, Role.AUDITOR})
+
     req = db.get(OperationRequest, request_id)
     if not req:
         raise HTTPException(status_code=404, detail="Request not found")
+
     return db.query(AuditEvent).filter(AuditEvent.request_id == request_id).order_by(AuditEvent.created_at.asc()).all()
 
 
 @router.post("/evidence")
-def attach_evidence(payload: EvidenceCreate, db: Session = Depends(get_db)):
+def attach_evidence(payload: EvidenceCreate, db: Session = Depends(get_db), role: Role = Depends(get_actor_role)):
+    require_role(role, {Role.ADMIN, Role.OPERATOR})
+
     req = db.get(OperationRequest, payload.request_id)
     if not req:
         raise HTTPException(status_code=404, detail="Request not found")
+
     evidence = EvidenceItem(
         id=payload.id,
         request_id=payload.request_id,
@@ -226,15 +253,18 @@ def attach_evidence(payload: EvidenceCreate, db: Session = Depends(get_db)):
         freshness_status=payload.freshness_status,
         payload=payload.payload,
     )
+
     db.add(evidence)
     db.commit()
     db.refresh(evidence)
-    record_event(db, payload.request_id, "evidence_attached", detail={"evidence_id": payload.id, "label": payload.label})
+    record_event(db, payload.request_id, "evidence_attached", actor=role.value, detail={"evidence_id": payload.id, "label": payload.label})
     return evidence
 
 
 @router.post("/requests/{request_id}/review")
-def review_request(request_id: str, payload: ReviewAction, db: Session = Depends(get_db)):
+def review_request(request_id: str, payload: ReviewAction, db: Session = Depends(get_db), role: Role = Depends(get_actor_role)):
+    require_role(role, {Role.ADMIN, Role.REVIEWER})
+
     req = db.get(OperationRequest, request_id)
     if not req:
         raise HTTPException(status_code=404, detail="Request not found")
@@ -248,12 +278,14 @@ def review_request(request_id: str, payload: ReviewAction, db: Session = Depends
 
     req.lifecycle_status = next_status
     db.commit()
-    record_event(db, request_id, "review_action", actor=payload.actor, detail={"decision": payload.decision, "notes": payload.notes})
+    record_event(db, request_id, "review_action", actor=payload.actor or role.value, detail={"decision": payload.decision, "notes": payload.notes})
     return {"request_id": request_id, "lifecycle_status": next_status}
 
 
 @router.get("/dashboard", response_model=OperationsDashboard)
-def dashboard(db: Session = Depends(get_db)):
+def dashboard(db: Session = Depends(get_db), role: Role = Depends(get_actor_role)):
+    require_role(role, {Role.ADMIN, Role.REVIEWER, Role.OPERATOR, Role.AUDITOR})
+
     requests = db.query(OperationRequest).order_by(OperationRequest.created_at.desc()).all()
     decisions = db.query(Decision).all()
     outcomes = [d.outcome for d in decisions]
@@ -270,6 +302,7 @@ def dashboard(db: Session = Depends(get_db)):
         )
         for r in requests[:10]
     ]
+
     return OperationsDashboard(
         total_requests=len(requests),
         admitted=outcomes.count("ADMIT"),
