@@ -332,7 +332,7 @@ Planned hardening:
 - signed receipts and tamper-evident evidence manifests
 - deployment profiles for cloud environments
 
-## Related Elyria / Veritas repos
+## Related Elyria Repos
 
 - [elyria-mission-control-engine](https://github.com/Kamanaka5502/elyria-mission-control-engine)
 - [elyria-runtime-law](https://github.com/Kamanaka5502/elyria-runtime-law)
