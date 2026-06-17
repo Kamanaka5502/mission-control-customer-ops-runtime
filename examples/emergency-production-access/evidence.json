@@ -1,0 +1,15 @@
+{
+  "id": "evidence-REQ-PROD-ACCESS-001-incident",
+  "request_id": "REQ-PROD-ACCESS-001",
+  "label": "Active incident record",
+  "source": "incident-management-system",
+  "freshness_status": "fresh",
+  "payload": {
+    "incident_id": "INC-1042",
+    "severity": "sev1",
+    "opened_at": "2026-06-16T21:44:00Z",
+    "current_status": "active",
+    "authorized_commander": "ops-lead",
+    "evidence_hash": "sha256-demo-incident-evidence-001"
+  }
+}
