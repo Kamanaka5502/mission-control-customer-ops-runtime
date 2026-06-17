@@ -6,6 +6,7 @@ from app.database import SessionLocal
 router = APIRouter()
 
 SERVICE_NAME = "mission-control-customer-ops-runtime"
+SCHEMA_HEAD = "20260617_0001"
 
 
 @router.get("/health")
@@ -39,4 +40,23 @@ def readiness():
         "status": "ready",
         "service": SERVICE_NAME,
         "database": "available",
+    }
+
+
+@router.get("/schema-version")
+def schema_version():
+    db = SessionLocal()
+    try:
+        current = db.execute(text("SELECT version_num FROM alembic_version")).scalar_one_or_none()
+    except Exception:
+        current = None
+    finally:
+        db.close()
+
+    return {
+        "service": SERVICE_NAME,
+        "schema_head": SCHEMA_HEAD,
+        "schema_version": current,
+        "migration_managed": current is not None,
+        "up_to_date": current == SCHEMA_HEAD,
     }
