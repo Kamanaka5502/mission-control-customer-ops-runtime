@@ -1,9 +1,27 @@
+import os
 from fastapi import Header, HTTPException
 from sqlalchemy.orm import Session
 from app.db_models import OperationRequest, Workflow
 
 
+def _enabled(value: str | None) -> bool:
+    return (value or "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def tenant_header_required() -> bool:
+    app_env = os.getenv("APP_ENV", "development").strip().lower()
+    return app_env in {"production", "prod"} or _enabled(os.getenv("REQUIRE_TENANT_HEADER"))
+
+
 def get_tenant_id(x_tenant_id: str | None = Header(default=None)) -> str | None:
+    if tenant_header_required() and not x_tenant_id:
+        raise HTTPException(
+            status_code=401,
+            detail={
+                "access": "DENIED",
+                "reason": "Explicit x-tenant-id header required when tenant enforcement is enabled.",
+            },
+        )
     return x_tenant_id
 
 
