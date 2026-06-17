@@ -22,7 +22,7 @@ class EvidenceCreate(BaseModel):
     label: str
     source: str
     freshness_status: str = "unknown"
-    payload: Dict[str, Any] = {}
+    payload: Dict[str, Any] = Field(default_factory=dict)
 
 
 class RequestCreate(BaseModel):
@@ -37,7 +37,7 @@ class RequestCreate(BaseModel):
     evidence_fresh: bool = False
     risk_level: str = Field(default="medium", pattern="^(low|medium|high|critical)$")
     approval_required: bool = True
-    metadata: Dict[str, Any] = {}
+    metadata: Dict[str, Any] = Field(default_factory=dict)
 
 
 class ReviewAction(BaseModel):
