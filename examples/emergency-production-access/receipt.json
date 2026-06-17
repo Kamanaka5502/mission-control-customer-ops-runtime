@@ -1,0 +1,19 @@
+{
+  "receipt_id": "receipt-REQ-PROD-ACCESS-001",
+  "request_id": "REQ-PROD-ACCESS-001",
+  "workflow_id": "security-exception",
+  "outcome": "ESCALATE",
+  "protected_effect_status": "PENDING_HIGH_AUTHORITY_REVIEW",
+  "no_bind_status": true,
+  "reason_codes": [
+    "AUTHORITY_PRESENT",
+    "SCOPE_MATCHED",
+    "EVIDENCE_PRESENT",
+    "EVIDENCE_FRESH",
+    "RISK_CRITICAL",
+    "CRITICAL_RISK_ESCALATION"
+  ],
+  "replay_token": "replay-demo-prod-access-001",
+  "public_hash": "sha256-demo-receipt-prod-access-001",
+  "notice": "Operational receipt for customer workflow review."
+}
