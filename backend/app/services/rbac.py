@@ -1,3 +1,4 @@
+import os
 from enum import Enum
 from fastapi import Header, HTTPException
 
@@ -9,7 +10,17 @@ class Role(str, Enum):
     AUDITOR = "auditor"
 
 
-def get_actor_role(x_actor_role: str | None = Header(default="operator")) -> Role:
+def production_mode() -> bool:
+    return os.getenv("APP_ENV", "development").strip().lower() in {"production", "prod"}
+
+
+def get_actor_role(x_actor_role: str | None = Header(default=None)) -> Role:
+    if production_mode() and not x_actor_role:
+        raise HTTPException(
+            status_code=401,
+            detail={"access": "DENIED", "reason": "Explicit x-actor-role header required in production mode."},
+        )
+
     try:
         return Role((x_actor_role or "operator").lower())
     except ValueError:
