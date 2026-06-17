@@ -4,11 +4,9 @@ A working customer operations platform for workflow intake, evidence collection,
 
 This is built as a Forward Deployed Engineering portfolio system: a customer-facing application that turns ambiguous operational requests into structured, reviewable, executable workflows.
 
-> Demo media hooks are reserved under `assets/`. Add a dashboard screenshot at `assets/dashboard-screenshot.png` and a short demo GIF at `assets/demo-walkthrough.gif` after capturing the running app.
-
 ## Visual demo
 
-![Dashboard screenshot placeholder](assets/dashboard-screenshot-placeholder.svg)
+![Mission Control Customer Operations Runtime infographic](assets/mission-control-runtime-infographic.png)
 
 A 20–40 second GIF should show:
 
