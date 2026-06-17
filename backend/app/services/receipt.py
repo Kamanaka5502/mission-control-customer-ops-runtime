@@ -4,17 +4,18 @@ from app.models import CustomerRequest, Receipt, Outcome
 
 
 def stable_hash(payload: dict) -> str:
-    encoded = json.dumps(payload, sort_keys=True).encode("utf-8")
+    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()
 
 
-def build_receipt(req: CustomerRequest, outcome: Outcome, effect_status: str, no_bind: bool, reason_codes: list[str]) -> Receipt:
+def build_receipt(req: CustomerRequest, outcome: Outcome | str, effect_status: str, no_bind: bool, reason_codes: list[str]) -> Receipt:
     public_payload = {
         "request_id": req.request_id,
         "workflow_id": req.workflow_id,
         "requested_action": req.requested_action,
         "outcome": outcome,
         "effect_status": effect_status,
+        "no_bind_status": no_bind,
         "reason_codes": reason_codes,
     }
     digest = stable_hash(public_payload)
