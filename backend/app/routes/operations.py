@@ -106,6 +106,36 @@ def get_request(request_id: str, db: Session = Depends(get_db)):
     return req
 
 
+@router.post("/requests/{request_id}/execute")
+def execute_request(request_id: str, db: Session = Depends(get_db)):
+    operation = db.get(OperationRequest, request_id)
+    if not operation:
+        raise HTTPException(status_code=404, detail="Request not found")
+
+    decision = db.query(Decision).filter(Decision.request_id == request_id).first()
+    if not decision:
+        raise HTTPException(status_code=404, detail="Decision not found")
+
+    allowed_statuses = {"ready_to_execute", "approved_for_execution"}
+    if operation.lifecycle_status not in allowed_statuses:
+        record_event(db, request_id, "execution_blocked", detail={"status": operation.lifecycle_status, "outcome": decision.outcome})
+        raise HTTPException(status_code=409, detail={"execution_status": "BLOCKED", "reason": "Request is not in an executable lifecycle state."})
+
+    if decision.outcome != "ADMIT" and operation.lifecycle_status != "approved_for_execution":
+        record_event(db, request_id, "execution_blocked", detail={"status": operation.lifecycle_status, "outcome": decision.outcome})
+        raise HTTPException(status_code=409, detail={"execution_status": "BLOCKED", "reason": "Runtime decision is not executable without review approval."})
+
+    operation.lifecycle_status = "executed"
+    db.commit()
+    record_event(db, request_id, "execution_completed", detail={"requested_action": operation.requested_action})
+    return {
+        "request_id": request_id,
+        "execution_status": "EXECUTED",
+        "requested_action": operation.requested_action,
+        "lifecycle_status": operation.lifecycle_status,
+    }
+
+
 @router.get("/requests/{request_id}/receipt")
 def persisted_receipt(request_id: str, db: Session = Depends(get_db)):
     operation = db.get(OperationRequest, request_id)
