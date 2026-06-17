@@ -15,6 +15,9 @@ def test_security_headers_are_present_on_health_response():
 
 
 def test_sensitive_runtime_routes_are_not_cached():
-    response = client.post("/ops/customers", json={"name": "Example", "industry": "test"})
+    response = client.post(
+        "/ops/customers",
+        json={"id": "customer-security-test", "name": "Example", "industry": "test"},
+    )
 
     assert response.headers["Cache-Control"] == "no-store"
