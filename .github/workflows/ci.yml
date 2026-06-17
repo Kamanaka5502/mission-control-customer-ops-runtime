@@ -9,6 +9,8 @@ on:
 jobs:
   backend:
     runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: sqlite:////tmp/mission_control_ci.db
     defaults:
       run:
         working-directory: backend
@@ -24,7 +26,9 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt
       - name: Apply database migration
-        run: python -m alembic upgrade head
+        run: |
+          rm -f /tmp/mission_control_ci.db
+          python -m alembic upgrade head
       - name: Run backend tests
         run: PYTHONPATH=. python -m pytest -q
 
