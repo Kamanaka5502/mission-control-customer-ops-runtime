@@ -8,6 +8,7 @@ from app.services.policy_gate import evaluate_request
 from app.services.receipt import build_receipt
 from app.services.audit import record_event
 from app.services.rbac import Role, get_actor_role, require_role
+from app.services.tenant_guard import get_tenant_id, get_request_for_tenant, get_workflow_for_tenant, require_tenant_access
 
 router = APIRouter()
 
@@ -34,12 +35,12 @@ def create_and_evaluate_request(
     payload: RequestCreate,
     db: Session = Depends(get_db),
     role: Role = Depends(get_actor_role),
+    tenant_id: str | None = Depends(get_tenant_id),
 ):
     require_role(role, {Role.ADMIN, Role.OPERATOR})
+    require_tenant_access(payload.customer_id, tenant_id)
 
-    workflow = db.get(Workflow, payload.workflow_id)
-    if not workflow:
-        raise HTTPException(status_code=404, detail="Workflow not found")
+    get_workflow_for_tenant(db, payload.workflow_id, tenant_id)
 
     existing = db.get(OperationRequest, payload.request_id)
     if existing:
@@ -102,28 +103,39 @@ def create_and_evaluate_request(
 
 
 @router.get("/requests")
-def list_requests(db: Session = Depends(get_db), role: Role = Depends(get_actor_role)):
+def list_requests(
+    db: Session = Depends(get_db),
+    role: Role = Depends(get_actor_role),
+    tenant_id: str | None = Depends(get_tenant_id),
+):
     require_role(role, {Role.ADMIN, Role.REVIEWER, Role.OPERATOR, Role.AUDITOR})
-    return db.query(OperationRequest).order_by(OperationRequest.created_at.desc()).all()
+    query = db.query(OperationRequest).order_by(OperationRequest.created_at.desc())
+    if tenant_id:
+        query = query.filter(OperationRequest.customer_id == tenant_id)
+    return query.all()
 
 
 @router.get("/requests/{request_id}")
-def get_request(request_id: str, db: Session = Depends(get_db), role: Role = Depends(get_actor_role)):
+def get_request(
+    request_id: str,
+    db: Session = Depends(get_db),
+    role: Role = Depends(get_actor_role),
+    tenant_id: str | None = Depends(get_tenant_id),
+):
     require_role(role, {Role.ADMIN, Role.REVIEWER, Role.OPERATOR, Role.AUDITOR})
-    req = db.get(OperationRequest, request_id)
-    if not req:
-        raise HTTPException(status_code=404, detail="Request not found")
-    return req
+    return get_request_for_tenant(db, request_id, tenant_id)
 
 
 @router.post("/requests/{request_id}/execute")
-def execute_request(request_id: str, db: Session = Depends(get_db), role: Role = Depends(get_actor_role)):
+def execute_request(
+    request_id: str,
+    db: Session = Depends(get_db),
+    role: Role = Depends(get_actor_role),
+    tenant_id: str | None = Depends(get_tenant_id),
+):
     require_role(role, {Role.ADMIN, Role.OPERATOR})
 
-    operation = db.get(OperationRequest, request_id)
-    if not operation:
-        raise HTTPException(status_code=404, detail="Request not found")
-
+    operation = get_request_for_tenant(db, request_id, tenant_id)
     decision = db.query(Decision).filter(Decision.request_id == request_id).first()
     if not decision:
         raise HTTPException(status_code=404, detail="Decision not found")
@@ -149,13 +161,15 @@ def execute_request(request_id: str, db: Session = Depends(get_db), role: Role =
 
 
 @router.get("/requests/{request_id}/receipt")
-def persisted_receipt(request_id: str, db: Session = Depends(get_db), role: Role = Depends(get_actor_role)):
+def persisted_receipt(
+    request_id: str,
+    db: Session = Depends(get_db),
+    role: Role = Depends(get_actor_role),
+    tenant_id: str | None = Depends(get_tenant_id),
+):
     require_role(role, {Role.ADMIN, Role.REVIEWER, Role.OPERATOR, Role.AUDITOR})
 
-    operation = db.get(OperationRequest, request_id)
-    if not operation:
-        raise HTTPException(status_code=404, detail="Request not found")
-
+    operation = get_request_for_tenant(db, request_id, tenant_id)
     decision = db.query(Decision).filter(Decision.request_id == request_id).first()
     if not decision:
         raise HTTPException(status_code=404, detail="Decision not found")
@@ -173,13 +187,15 @@ def persisted_receipt(request_id: str, db: Session = Depends(get_db), role: Role
 
 
 @router.post("/requests/{request_id}/replay/same-condition")
-def persisted_same_condition_replay(request_id: str, db: Session = Depends(get_db), role: Role = Depends(get_actor_role)):
+def persisted_same_condition_replay(
+    request_id: str,
+    db: Session = Depends(get_db),
+    role: Role = Depends(get_actor_role),
+    tenant_id: str | None = Depends(get_tenant_id),
+):
     require_role(role, {Role.ADMIN, Role.REVIEWER, Role.OPERATOR, Role.AUDITOR})
 
-    operation = db.get(OperationRequest, request_id)
-    if not operation:
-        raise HTTPException(status_code=404, detail="Request not found")
-
+    operation = get_request_for_tenant(db, request_id, tenant_id)
     prior = db.query(Decision).filter(Decision.request_id == request_id).first()
     if not prior:
         raise HTTPException(status_code=404, detail="Decision not found")
@@ -200,12 +216,15 @@ def persisted_same_condition_replay(request_id: str, db: Session = Depends(get_d
 
 
 @router.post("/requests/{request_id}/replay/changed-condition")
-def persisted_changed_condition_replay(request_id: str, db: Session = Depends(get_db), role: Role = Depends(get_actor_role)):
+def persisted_changed_condition_replay(
+    request_id: str,
+    db: Session = Depends(get_db),
+    role: Role = Depends(get_actor_role),
+    tenant_id: str | None = Depends(get_tenant_id),
+):
     require_role(role, {Role.ADMIN, Role.REVIEWER, Role.OPERATOR, Role.AUDITOR})
 
-    operation = db.get(OperationRequest, request_id)
-    if not operation:
-        raise HTTPException(status_code=404, detail="Request not found")
+    operation = get_request_for_tenant(db, request_id, tenant_id)
 
     changed = operation_to_customer_request(operation)
     changed.authority_present = False
@@ -227,23 +246,28 @@ def persisted_changed_condition_replay(request_id: str, db: Session = Depends(ge
 
 
 @router.get("/requests/{request_id}/audit")
-def request_audit_trail(request_id: str, db: Session = Depends(get_db), role: Role = Depends(get_actor_role)):
+def request_audit_trail(
+    request_id: str,
+    db: Session = Depends(get_db),
+    role: Role = Depends(get_actor_role),
+    tenant_id: str | None = Depends(get_tenant_id),
+):
     require_role(role, {Role.ADMIN, Role.REVIEWER, Role.AUDITOR})
 
-    req = db.get(OperationRequest, request_id)
-    if not req:
-        raise HTTPException(status_code=404, detail="Request not found")
-
+    get_request_for_tenant(db, request_id, tenant_id)
     return db.query(AuditEvent).filter(AuditEvent.request_id == request_id).order_by(AuditEvent.created_at.asc()).all()
 
 
 @router.post("/evidence")
-def attach_evidence(payload: EvidenceCreate, db: Session = Depends(get_db), role: Role = Depends(get_actor_role)):
+def attach_evidence(
+    payload: EvidenceCreate,
+    db: Session = Depends(get_db),
+    role: Role = Depends(get_actor_role),
+    tenant_id: str | None = Depends(get_tenant_id),
+):
     require_role(role, {Role.ADMIN, Role.OPERATOR})
 
-    req = db.get(OperationRequest, payload.request_id)
-    if not req:
-        raise HTTPException(status_code=404, detail="Request not found")
+    get_request_for_tenant(db, payload.request_id, tenant_id)
 
     evidence = EvidenceItem(
         id=payload.id,
@@ -262,12 +286,16 @@ def attach_evidence(payload: EvidenceCreate, db: Session = Depends(get_db), role
 
 
 @router.post("/requests/{request_id}/review")
-def review_request(request_id: str, payload: ReviewAction, db: Session = Depends(get_db), role: Role = Depends(get_actor_role)):
+def review_request(
+    request_id: str,
+    payload: ReviewAction,
+    db: Session = Depends(get_db),
+    role: Role = Depends(get_actor_role),
+    tenant_id: str | None = Depends(get_tenant_id),
+):
     require_role(role, {Role.ADMIN, Role.REVIEWER})
 
-    req = db.get(OperationRequest, request_id)
-    if not req:
-        raise HTTPException(status_code=404, detail="Request not found")
+    req = get_request_for_tenant(db, request_id, tenant_id)
 
     next_status = {
         "approve": "approved_for_execution",
@@ -283,11 +311,22 @@ def review_request(request_id: str, payload: ReviewAction, db: Session = Depends
 
 
 @router.get("/dashboard", response_model=OperationsDashboard)
-def dashboard(db: Session = Depends(get_db), role: Role = Depends(get_actor_role)):
+def dashboard(
+    db: Session = Depends(get_db),
+    role: Role = Depends(get_actor_role),
+    tenant_id: str | None = Depends(get_tenant_id),
+):
     require_role(role, {Role.ADMIN, Role.REVIEWER, Role.OPERATOR, Role.AUDITOR})
 
-    requests = db.query(OperationRequest).order_by(OperationRequest.created_at.desc()).all()
-    decisions = db.query(Decision).all()
+    requests_query = db.query(OperationRequest).order_by(OperationRequest.created_at.desc())
+    decisions_query = db.query(Decision).join(OperationRequest, Decision.request_id == OperationRequest.id)
+
+    if tenant_id:
+        requests_query = requests_query.filter(OperationRequest.customer_id == tenant_id)
+        decisions_query = decisions_query.filter(OperationRequest.customer_id == tenant_id)
+
+    requests = requests_query.all()
+    decisions = decisions_query.all()
     outcomes = [d.outcome for d in decisions]
     pending = [r for r in requests if r.lifecycle_status in {"waiting_for_review", "pending_approval", "pending_higher_authority"}]
     recent = [
