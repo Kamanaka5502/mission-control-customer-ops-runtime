@@ -4,10 +4,25 @@ from app.main import app
 client = TestClient(app)
 
 
+def test_production_mode_requires_trusted_ingress(monkeypatch):
+    monkeypatch.setenv("APP_ENV", "production")
+
+    response = client.get(
+        "/ops/customers",
+        headers={"x-actor-role": "auditor", "x-tenant-id": "tenant-a"},
+    )
+
+    assert response.status_code == 401
+    assert response.json()["detail"]["access"] == "DENIED"
+
+
 def test_production_mode_requires_explicit_actor_role(monkeypatch):
     monkeypatch.setenv("APP_ENV", "production")
 
-    response = client.get("/ops/customers", headers={"x-tenant-id": "tenant-a"})
+    response = client.get(
+        "/ops/customers",
+        headers={"x-ingress-verified": "true", "x-tenant-id": "tenant-a"},
+    )
 
     assert response.status_code == 401
     assert response.json()["detail"]["access"] == "DENIED"
@@ -16,7 +31,25 @@ def test_production_mode_requires_explicit_actor_role(monkeypatch):
 def test_production_mode_requires_tenant_header(monkeypatch):
     monkeypatch.setenv("APP_ENV", "production")
 
-    response = client.get("/ops/customers", headers={"x-actor-role": "auditor"})
+    response = client.get(
+        "/ops/customers",
+        headers={"x-ingress-verified": "true", "x-actor-role": "auditor"},
+    )
 
     assert response.status_code == 401
     assert response.json()["detail"]["access"] == "DENIED"
+
+
+def test_production_mode_accepts_verified_ingress_identity(monkeypatch):
+    monkeypatch.setenv("APP_ENV", "production")
+
+    response = client.get(
+        "/ops/customers",
+        headers={
+            "x-ingress-verified": "true",
+            "x-actor-role": "auditor",
+            "x-tenant-id": "tenant-a",
+        },
+    )
+
+    assert response.status_code == 200
