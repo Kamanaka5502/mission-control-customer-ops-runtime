@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from app.database import init_db
 from app.routes.requests import router as requests_router
 from app.routes.replay import router as replay_router
@@ -8,8 +9,16 @@ from app.routes.operations import router as operations_router
 
 app = FastAPI(
     title="Mission Control: Customer Operations Runtime",
-    version="0.2.0",
-    description="Customer operations runtime with intake, persistence, review gates, receipts, replay, and dashboard APIs."
+    version="0.3.0",
+    description="Customer operations runtime with intake, persistence, review gates, receipts, replay, audit trail, and dashboard APIs."
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 
