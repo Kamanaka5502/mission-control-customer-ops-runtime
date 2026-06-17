@@ -40,6 +40,17 @@ docker compose -f docker-compose.prod.yml up --build
 
 Run the API behind authenticated ingress. Production requests must include verified ingress identity, actor role, and tenant id after authentication and tenant resolution.
 
+## Production boundary posture
+
+The runtime intentionally fails closed when `APP_ENV=production` is set without required deployment controls:
+
+- `DATABASE_URL` must be present and must not use SQLite
+- `REQUIRE_TENANT_HEADER` must be enabled
+- `REQUIRE_TRUSTED_INGRESS` must be enabled
+- `CORS_ALLOW_ORIGINS` must be explicit and must not use localhost origins
+
+The production compose profile binds API and frontend ports to localhost, requires explicit CORS origins, runs service containers as non-root users, blocks privilege escalation, and uses read-only containers with temporary writable storage.
+
 ## Schema versioning
 
 Apply the current schema revision from the backend directory:
@@ -81,6 +92,8 @@ Before external deployment, verify:
 - API is behind authenticated ingress
 - tenant id is resolved upstream
 - CORS origins are explicitly listed for the deployed frontend
+- service containers run as non-root users
+- public traffic cannot directly set trusted identity headers
 - logs preserve correlation ids
 - closed/REFUSE requests cannot release protected action
 - dependency update alerts are enabled
