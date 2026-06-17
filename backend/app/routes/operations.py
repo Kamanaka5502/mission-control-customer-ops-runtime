@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.database import get_db
-from app.db_models import OperationRequest, Decision, EvidenceItem, Workflow
+from app.db_models import OperationRequest, Decision, EvidenceItem, Workflow, AuditEvent
 from app.models import CustomerRequest, RuntimeDecision
 from app.schemas import RequestCreate, EvidenceCreate, ReviewAction, OperationsDashboard, RequestSummary
 from app.services.policy_gate import evaluate_request
@@ -9,6 +9,23 @@ from app.services.receipt import build_receipt
 from app.services.audit import record_event
 
 router = APIRouter()
+
+
+def operation_to_customer_request(operation: OperationRequest) -> CustomerRequest:
+    return CustomerRequest(
+        customer_id=operation.customer_id,
+        workflow_id=operation.workflow_id,
+        request_id=operation.id,
+        requested_action=operation.requested_action,
+        business_context=operation.business_context,
+        authority_present=operation.authority_present,
+        scope_matched=operation.scope_matched,
+        evidence_present=operation.evidence_present,
+        evidence_fresh=operation.evidence_fresh,
+        risk_level=operation.risk_level,
+        approval_required=operation.approval_required,
+        metadata=operation.request_metadata or {},
+    )
 
 
 @router.post("/requests/evaluate", response_model=RuntimeDecision)
@@ -79,6 +96,91 @@ def create_and_evaluate_request(payload: RequestCreate, db: Session = Depends(ge
 @router.get("/requests")
 def list_requests(db: Session = Depends(get_db)):
     return db.query(OperationRequest).order_by(OperationRequest.created_at.desc()).all()
+
+
+@router.get("/requests/{request_id}")
+def get_request(request_id: str, db: Session = Depends(get_db)):
+    req = db.get(OperationRequest, request_id)
+    if not req:
+        raise HTTPException(status_code=404, detail="Request not found")
+    return req
+
+
+@router.get("/requests/{request_id}/receipt")
+def persisted_receipt(request_id: str, db: Session = Depends(get_db)):
+    operation = db.get(OperationRequest, request_id)
+    if not operation:
+        raise HTTPException(status_code=404, detail="Request not found")
+    decision = db.query(Decision).filter(Decision.request_id == request_id).first()
+    if not decision:
+        raise HTTPException(status_code=404, detail="Decision not found")
+
+    req_model = operation_to_customer_request(operation)
+    receipt = build_receipt(
+        req_model,
+        decision.outcome,
+        decision.protected_effect_status,
+        decision.no_bind_status,
+        decision.reason_codes,
+    )
+    record_event(db, request_id, "receipt_viewed", detail={"receipt_id": receipt.receipt_id})
+    return receipt
+
+
+@router.post("/requests/{request_id}/replay/same-condition")
+def persisted_same_condition_replay(request_id: str, db: Session = Depends(get_db)):
+    operation = db.get(OperationRequest, request_id)
+    if not operation:
+        raise HTTPException(status_code=404, detail="Request not found")
+    prior = db.query(Decision).filter(Decision.request_id == request_id).first()
+    if not prior:
+        raise HTTPException(status_code=404, detail="Decision not found")
+
+    req_model = operation_to_customer_request(operation)
+    outcome, effect_status, no_bind, reason_codes = evaluate_request(req_model)
+    record_event(db, request_id, "same_condition_replay", detail={"observed_outcome": outcome.value})
+    return {
+        "request_id": request_id,
+        "replay_type": "same_condition",
+        "prior_outcome": prior.outcome,
+        "observed_outcome": outcome.value,
+        "matched": prior.outcome == outcome.value,
+        "protected_effect_status": effect_status,
+        "no_bind_status": no_bind,
+        "reason_codes": reason_codes,
+    }
+
+
+@router.post("/requests/{request_id}/replay/changed-condition")
+def persisted_changed_condition_replay(request_id: str, db: Session = Depends(get_db)):
+    operation = db.get(OperationRequest, request_id)
+    if not operation:
+        raise HTTPException(status_code=404, detail="Request not found")
+
+    changed = operation_to_customer_request(operation)
+    changed.authority_present = False
+    changed.evidence_fresh = False
+    changed.risk_level = "high"
+    outcome, effect_status, no_bind, reason_codes = evaluate_request(changed)
+    record_event(db, request_id, "changed_condition_replay", detail={"observed_outcome": outcome.value})
+    return {
+        "request_id": request_id,
+        "replay_type": "changed_condition",
+        "changed_conditions": ["authority_removed", "evidence_stale", "risk_high"],
+        "observed_outcome": outcome.value,
+        "protected_effect_status": effect_status,
+        "no_bind_status": no_bind,
+        "reason_codes": reason_codes,
+        "customer_visible_proof": "Changed conditions do not inherit the previous authorization posture.",
+    }
+
+
+@router.get("/requests/{request_id}/audit")
+def request_audit_trail(request_id: str, db: Session = Depends(get_db)):
+    req = db.get(OperationRequest, request_id)
+    if not req:
+        raise HTTPException(status_code=404, detail="Request not found")
+    return db.query(AuditEvent).filter(AuditEvent.request_id == request_id).order_by(AuditEvent.created_at.asc()).all()
 
 
 @router.post("/evidence")
