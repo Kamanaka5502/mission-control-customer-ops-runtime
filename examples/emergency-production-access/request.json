@@ -1,0 +1,18 @@
+{
+  "customer_id": "demo-customer",
+  "workflow_id": "security-exception",
+  "request_id": "REQ-PROD-ACCESS-001",
+  "requested_action": "grant_emergency_production_access",
+  "business_context": "On-call engineer needs temporary production access to resolve an active incident.",
+  "authority_present": true,
+  "scope_matched": true,
+  "evidence_present": true,
+  "evidence_fresh": true,
+  "risk_level": "critical",
+  "approval_required": true,
+  "metadata": {
+    "incident_id": "INC-1042",
+    "requested_duration_minutes": 30,
+    "request_source": "customer-ops-console"
+  }
+}
