@@ -22,7 +22,7 @@ class CustomerRequest(BaseModel):
     evidence_fresh: bool = False
     risk_level: str = Field(default="medium", pattern="^(low|medium|high|critical)$")
     approval_required: bool = True
-    metadata: Dict[str, Any] = {}
+    metadata: Dict[str, Any] = Field(default_factory=dict)
 
 
 class RuntimeDecision(BaseModel):
@@ -47,4 +47,5 @@ class Receipt(BaseModel):
     reason_codes: List[str]
     replay_token: str
     public_hash: str
+    signature: str
     notice: str
