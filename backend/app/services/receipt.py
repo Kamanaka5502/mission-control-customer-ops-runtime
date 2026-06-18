@@ -85,6 +85,7 @@ def build_receipt(
         receipt_id=f"receipt-{req.request_id}",
         request_id=req.request_id,
         workflow_id=req.workflow_id,
+        requested_action=req.requested_action,
         outcome=outcome,
         protected_effect_status=effect_status,
         no_bind_status=no_bind,
