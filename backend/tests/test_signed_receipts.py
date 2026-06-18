@@ -68,3 +68,16 @@ def test_tampered_receipt_fails_verification():
     result = verify_receipt_signature(receipt)
     assert result["valid"] is False
     assert result["hash_matches"] is False
+
+
+def test_missing_signed_boolean_field_fails_verification():
+    request_id = create_request()
+    receipt = client.get(f"/ops/requests/{request_id}/receipt").json()
+
+    assert receipt["no_bind_status"] is False
+    del receipt["no_bind_status"]
+
+    result = verify_receipt_signature(receipt)
+    assert result["valid"] is False
+    assert result["reason"] == "missing_required_signed_fields"
+    assert "no_bind_status" in result["missing_fields"]
