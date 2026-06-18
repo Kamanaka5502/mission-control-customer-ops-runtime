@@ -4,7 +4,8 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
-from app.services.proof_store import proof_bundle_path
+from app.services.integrity import stable_hash
+from app.services.proof_store import proof_bundle_path, verify_proof_bundle
 
 client = TestClient(app)
 
@@ -48,8 +49,17 @@ def create_request():
     return request_id
 
 
-def test_proof_bundle_export_persists_and_verifies(tmp_path, monkeypatch):
-    monkeypatch.setenv("PROOF_STORE_PATH", str(tmp_path))
+def recompute_unsigned_proof_hash(bundle: dict) -> str:
+    body = dict(bundle)
+    body.pop("proof_hash", None)
+    body.pop("proof_hash_algorithm", None)
+    body.pop("proof_signature_algorithm", None)
+    body.pop("proof_signature_key_id", None)
+    body.pop("proof_signature", None)
+    return stable_hash(body)
+
+
+def test_proof_bundle_export_persists_and_verifies(monkeypatch):
     request_id = create_request()
 
     exported = client.post(f"/ops/requests/{request_id}/proof-bundle")
@@ -64,16 +74,18 @@ def test_proof_bundle_export_persists_and_verifies(tmp_path, monkeypatch):
     bundle = stored.json()
     assert bundle["request_id"] == request_id
     assert bundle["proof_hash"] == export_body["proof_hash"]
+    assert bundle["proof_signature"]
     assert bundle["receipt_verification"]["valid"] is True
     assert bundle["audit_ledger"]["valid"] is True
 
     verified = client.get(f"/ops/requests/{request_id}/proof-bundle/verify")
     assert verified.status_code == 200
-    assert verified.json()["verification"]["valid"] is True
+    verification = verified.json()["verification"]
+    assert verification["valid"] is True
+    assert verification["checks"]["proof_signature_valid"] is True
 
 
-def test_proof_bundle_contains_required_artifacts(tmp_path, monkeypatch):
-    monkeypatch.setenv("PROOF_STORE_PATH", str(tmp_path))
+def test_proof_bundle_contains_required_artifacts():
     request_id = create_request()
 
     client.post(f"/ops/requests/{request_id}/proof-bundle")
@@ -84,10 +96,26 @@ def test_proof_bundle_contains_required_artifacts(tmp_path, monkeypatch):
     assert "decision" in bundle
     assert "receipt" in bundle
     assert "replay_result" in bundle
+    assert "audit_events" in bundle
     assert "audit_ledger" in bundle
     assert "integrity" in bundle
-    assert bundle["receipt"]["request_snapshot_hash"] == bundle["request_snapshot"]["snapshot_hash"]
-    assert bundle["receipt"]["evidence_manifest_hash"] == bundle["evidence_manifest"]["manifest_hash"]
+    assert bundle["receipt"]["replay_token"] == bundle["decision"]["replay_token"]
+    assert bundle["receipt"]["receipt_id"] == bundle["decision"]["receipt_id"]
+
+
+def test_proof_bundle_tamper_fails_even_if_hash_is_recomputed():
+    request_id = create_request()
+    client.post(f"/ops/requests/{request_id}/proof-bundle")
+    bundle = client.get(f"/ops/requests/{request_id}/proof-bundle").json()
+
+    bundle["request_snapshot"]["snapshot"]["requested_action"] = "forged_action"
+    bundle["proof_hash"] = recompute_unsigned_proof_hash(bundle)
+
+    result = verify_proof_bundle(bundle)
+    assert result["valid"] is False
+    assert result["checks"]["proof_hash_matches"] is True
+    assert result["checks"]["proof_signature_valid"] is False
+    assert result["checks"]["request_snapshot_hash_valid"] is False
 
 
 @pytest.mark.parametrize("request_id", ["../escape", "nested/path", "bad\\path", "bad path"])
