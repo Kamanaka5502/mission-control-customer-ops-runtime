@@ -1,15 +1,13 @@
 import hashlib
 import hmac
 import json
-import os
 from typing import Any
 
 from app.models import CustomerRequest, Outcome, Receipt
+from app.services.key_management import current_receipt_key_id, current_receipt_secret, receipt_secret_for_key_id
 
 
 SIGNATURE_ALGORITHM = "hmac-sha256"
-DEFAULT_RECEIPT_KEY_ID = "development-receipt-key"
-DEFAULT_RECEIPT_SECRET = "development-receipt-secret-not-for-production"
 REQUIRED_SIGNED_FIELDS = {
     "request_id",
     "workflow_id",
@@ -29,11 +27,11 @@ def stable_hash(payload: dict[str, Any]) -> str:
 
 
 def receipt_key_id() -> str:
-    return os.getenv("RECEIPT_SIGNING_KEY_ID", DEFAULT_RECEIPT_KEY_ID).strip() or DEFAULT_RECEIPT_KEY_ID
+    return current_receipt_key_id()
 
 
 def receipt_secret() -> str:
-    return os.getenv("RECEIPT_SIGNING_SECRET", DEFAULT_RECEIPT_SECRET)
+    return current_receipt_secret()
 
 
 def _outcome_value(outcome: Outcome | str) -> str:
@@ -68,6 +66,26 @@ def receipt_public_payload(
 def sign_public_hash(public_hash: str, *, secret: str | None = None) -> str:
     key = (secret if secret is not None else receipt_secret()).encode("utf-8")
     return hmac.new(key, public_hash.encode("ascii"), hashlib.sha256).hexdigest()
+
+
+def verify_public_hash_signature(public_hash: str, signature: str, key_id: str | None) -> dict[str, Any]:
+    secret = receipt_secret_for_key_id(key_id)
+    if not secret:
+        return {
+            "valid": False,
+            "signature_matches": False,
+            "reason": "unknown_signature_key_id",
+            "signature_algorithm": SIGNATURE_ALGORITHM,
+            "signature_key_id": key_id,
+        }
+    expected_signature = sign_public_hash(public_hash, secret=secret)
+    signature_matches = hmac.compare_digest(expected_signature, str(signature or ""))
+    return {
+        "valid": signature_matches,
+        "signature_matches": signature_matches,
+        "signature_algorithm": SIGNATURE_ALGORITHM,
+        "signature_key_id": key_id,
+    }
 
 
 def build_receipt(
@@ -153,15 +171,24 @@ def verify_receipt_signature(receipt: dict[str, Any], *, secret: str | None = No
     )
     expected_hash = stable_hash(public_payload)
     provided_hash = str(receipt.get("public_hash") or "")
-    expected_signature = sign_public_hash(expected_hash, secret=secret)
     provided_signature = str(receipt.get("signature") or "")
+    signature_key_id = str(receipt.get("signature_key_id") or "")
 
     hash_matches = hmac.compare_digest(expected_hash, provided_hash)
-    signature_matches = hmac.compare_digest(expected_signature, provided_signature)
+    if secret is not None:
+        expected_signature = sign_public_hash(expected_hash, secret=secret)
+        signature_matches = hmac.compare_digest(expected_signature, provided_signature)
+        reason = None
+    else:
+        signature_result = verify_public_hash_signature(expected_hash, provided_signature, signature_key_id)
+        signature_matches = bool(signature_result.get("signature_matches"))
+        reason = signature_result.get("reason")
+
     return {
         "valid": hash_matches and signature_matches,
         "hash_matches": hash_matches,
         "signature_matches": signature_matches,
+        "reason": reason,
         "expected_public_hash": expected_hash,
         "provided_public_hash": provided_hash,
         "signature_algorithm": receipt.get("signature_algorithm"),

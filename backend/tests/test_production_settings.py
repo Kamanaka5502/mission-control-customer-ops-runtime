@@ -10,6 +10,7 @@ def set_base_production_env(monkeypatch):
     monkeypatch.setenv("REQUIRE_TRUSTED_INGRESS", "true")
     monkeypatch.setenv("AUTH_REQUIRED", "true")
     monkeypatch.setenv("AUTH_TOKEN_SECRET", "0123456789abcdef0123456789abcdef")
+    monkeypatch.setenv("RECEIPT_SIGNING_KEY_ID", "receipt-key-test")
     monkeypatch.setenv("RECEIPT_SIGNING_SECRET", "receipt-signing-secret-0123456789abcdef")
     monkeypatch.setenv("CORS_ALLOW_ORIGINS", "https://app.example.com")
 

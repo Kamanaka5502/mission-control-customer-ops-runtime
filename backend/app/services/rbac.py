@@ -10,6 +10,8 @@ from typing import Any
 
 from fastapi import Header, HTTPException
 
+from app.services.key_management import auth_verification_secrets, current_auth_secret, is_safe_secret
+
 
 class Role(str, Enum):
     REQUESTER = "requester"
@@ -35,16 +37,6 @@ class Actor:
 
 
 TRUE_VALUES = {"1", "true", "yes", "on"}
-DEFAULT_SECRET_VALUES = {
-    "",
-    "change-me",
-    "changeme",
-    "dev-secret",
-    "default",
-    "secret",
-    "replace_with_32_plus_character_random_secret",
-}
-
 PERMISSIONS_BY_ROLE: dict[Role, set[str]] = {
     Role.REQUESTER: {"request:create", "evidence:attach", "request:read", "dashboard:read"},
     Role.REVIEWER: {"request:read", "review:write", "receipt:read", "replay:run", "audit:read", "dashboard:read"},
@@ -87,12 +79,11 @@ def trusted_ingress_required() -> bool:
 
 
 def signing_secret() -> str:
-    return os.getenv("AUTH_TOKEN_SECRET", "")
+    return current_auth_secret()
 
 
 def production_auth_config_valid() -> bool:
-    secret = signing_secret().strip()
-    return auth_required() and secret.lower() not in DEFAULT_SECRET_VALUES and len(secret) >= 32
+    return auth_required() and is_safe_secret(signing_secret())
 
 
 def _b64url_encode(raw: bytes) -> str:
@@ -138,22 +129,28 @@ def create_auth_token(
 
 
 def verify_auth_token(token: str) -> Actor:
-    key = signing_secret().encode("utf-8")
-    if not key:
-        raise HTTPException(status_code=500, detail="Auth token secret is not configured")
-
     try:
         payload_segment, signature_segment = token.split(".", 1)
     except ValueError:
         raise HTTPException(status_code=401, detail={"access": "DENIED", "reason": "Malformed bearer token"})
 
-    expected_signature = hmac.new(key, payload_segment.encode("ascii"), hashlib.sha256).digest()
     try:
         provided_signature = _b64url_decode(signature_segment)
     except Exception:
         raise HTTPException(status_code=401, detail={"access": "DENIED", "reason": "Malformed bearer token signature"})
 
-    if not hmac.compare_digest(expected_signature, provided_signature):
+    verification_secrets = auth_verification_secrets()
+    if not verification_secrets:
+        raise HTTPException(status_code=500, detail="Auth token secret is not configured")
+
+    signature_valid = False
+    for secret in verification_secrets:
+        expected_signature = hmac.new(secret.encode("utf-8"), payload_segment.encode("ascii"), hashlib.sha256).digest()
+        if hmac.compare_digest(expected_signature, provided_signature):
+            signature_valid = True
+            break
+
+    if not signature_valid:
         raise HTTPException(status_code=401, detail={"access": "DENIED", "reason": "Invalid bearer token signature"})
 
     try:
@@ -259,35 +256,24 @@ def get_actor_role(
 
 def require_role(role: Role, allowed: set[Role]):
     if role not in allowed:
-        raise HTTPException(
-            status_code=403,
-            detail={
-                "access": "DENIED",
-                "role": role.value,
-                "allowed_roles": sorted([r.value for r in allowed]),
-            },
-        )
+        raise HTTPException(status_code=403, detail={"access": "DENIED", "reason": f"Role {role.value} is not allowed"})
 
 
 def require_permission(actor: Actor, permission: str):
-    if actor.role == Role.SERVICE_ACCOUNT:
-        if permission not in SERVICE_ACCOUNT_ALLOWED_PERMISSIONS:
-            raise HTTPException(
-                status_code=403,
-                detail={"access": "DENIED", "role": actor.role.value, "reason": "Service account endpoint not allowed"},
-            )
-        if permission not in actor.scopes and "*" not in actor.scopes:
-            raise HTTPException(
-                status_code=403,
-                detail={"access": "DENIED", "role": actor.role.value, "missing_scope": permission},
-            )
+    if actor.role == Role.ADMIN:
         return
 
-    permissions = PERMISSIONS_BY_ROLE.get(actor.role, set())
-    if "*" in permissions or permission in permissions:
+    role_permissions = set(PERMISSIONS_BY_ROLE.get(actor.role, set()))
+    if permission in role_permissions:
+        return
+
+    if actor.role == Role.SERVICE_ACCOUNT and permission in SERVICE_ACCOUNT_ALLOWED_PERMISSIONS and permission in actor.scopes:
         return
 
     raise HTTPException(
         status_code=403,
-        detail={"access": "DENIED", "role": actor.role.value, "required_permission": permission},
+        detail={
+            "access": "DENIED",
+            "reason": f"Actor role {actor.role.value} lacks permission {permission}",
+        },
     )

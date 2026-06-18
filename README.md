@@ -335,12 +335,11 @@ Implemented controls include:
 - Audit ledgers are hash-chained and verifiable.
 - Proof bundles are signed and verifiable.
 - API body-size and rate controls protect the API boundary.
+- Runtime signing keys support current and verify-only previous values.
 
 Remaining production-readiness work includes:
 
 - distributed limiter or gateway enforcement for multi-instance deployments
-- execution idempotency and final execution checks
-- key management and key rotation procedures
 - PostgreSQL CI coverage
 - monitoring procedures
 - customer deployment approval and external review
@@ -390,6 +389,7 @@ python scripts/check_deployment_readiness.py --strict
 - `docs/api-security.md`
 - `docs/audit-ledger.md`
 - `docs/persistent-proof-store.md`
+- `docs/key-management.md`
 - `docs/local-demo-walkthrough.md`
 - `docs/deployment-evidence-template.md`
 - `docs/release-checklist.md`
@@ -403,8 +403,6 @@ python scripts/check_deployment_readiness.py --strict
 The remaining production-readiness work is tracked in GitHub issue #27 and includes:
 
 - PostgreSQL production and CI path
-- execution safety and idempotency
-- key management and key rotation
 - monitoring profile
 - deployment certification gate
 - customer-approved storage, retention, and backup policy

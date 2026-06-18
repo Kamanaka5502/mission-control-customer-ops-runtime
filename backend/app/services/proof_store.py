@@ -1,5 +1,4 @@
 import hashlib
-import hmac
 import json
 import re
 from datetime import datetime, timezone
@@ -12,7 +11,7 @@ from app.db_models import AuditEvent, Decision, EvidenceItem, OperationRequest
 from app.services.audit import AUDIT_GENESIS_HASH, audit_head_anchor, compute_audit_event_hash, verify_audit_ledger
 from app.services.integrity import build_evidence_manifest, build_request_snapshot, stable_hash
 from app.services.policy_gate import evaluate_request
-from app.services.receipt import SIGNATURE_ALGORITHM, build_receipt, receipt_key_id, sign_public_hash, verify_receipt_signature
+from app.services.receipt import SIGNATURE_ALGORITHM, build_receipt, receipt_key_id, sign_public_hash, verify_public_hash_signature, verify_receipt_signature
 
 
 PROOF_BUNDLE_VERSION = "proof-bundle-v1"
@@ -272,7 +271,8 @@ def verify_proof_bundle(bundle: dict[str, Any]) -> dict[str, Any]:
     body = _proof_hash_body(bundle)
     expected_hash = _compute_proof_hash(body)
     provided_signature = str(bundle.get("proof_signature") or "")
-    expected_signature = _sign_proof_hash(expected_hash)
+    proof_key_id = str(bundle.get("proof_signature_key_id") or "")
+    proof_signature_result = verify_public_hash_signature(expected_hash, provided_signature, proof_key_id)
 
     receipt_result = verify_receipt_signature(bundle.get("receipt") or {})
     audit_result = _verify_audit_events(bundle)
@@ -283,7 +283,7 @@ def verify_proof_bundle(bundle: dict[str, Any]) -> dict[str, Any]:
 
     checks = {
         "proof_hash_matches": provided_hash == expected_hash,
-        "proof_signature_valid": hmac.compare_digest(provided_signature, expected_signature),
+        "proof_signature_valid": bool(proof_signature_result.get("valid")),
         "receipt_valid": bool(receipt_result.get("valid")),
         "receipt_preserves_decision_token": decision.get("replay_token") == receipt.get("replay_token"),
         "receipt_preserves_decision_id": decision.get("receipt_id") == receipt.get("receipt_id"),
@@ -301,6 +301,7 @@ def verify_proof_bundle(bundle: dict[str, Any]) -> dict[str, Any]:
         "provided_proof_hash": provided_hash,
         "proof_signature_algorithm": bundle.get("proof_signature_algorithm"),
         "proof_signature_key_id": bundle.get("proof_signature_key_id"),
+        "proof_signature_verification": proof_signature_result,
         "receipt_verification": receipt_result,
         "audit_verification": audit_result,
     }
