@@ -21,8 +21,8 @@ Backend:
 ```bash
 cd backend
 python -m pip install -r requirements.txt
-python -m alembic upgrade head
-PYTHONPATH=. python -m pytest -q
+DATABASE_URL=sqlite:////tmp/mission_control_contrib.db python -m alembic upgrade head
+DATABASE_URL=sqlite:////tmp/mission_control_contrib.db PYTHONPATH=. python -m pytest -q
 ```
 
 Frontend:
