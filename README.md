@@ -1,8 +1,6 @@
 # Mission Control: Customer Operations Runtime
 
-Mission Control is a production-candidate customer-operations runtime for controlled execution. It currently implements structured workflow intake, evidence-aware review, fail-closed execution gating, receipts, replay, audit trail, production boundary checks, and dashboard observability.
-
-The all-A production-candidate lane adds full authentication, RBAC, immutable snapshots, evidence integrity, signed receipts, external verification, tamper-evident audit, persistent proof storage, key management, and deployment certification gates. Those items are tracked as roadmap work until implemented, tested, and documented.
+Mission Control is a production-candidate customer-operations runtime for controlled execution. It implements structured workflow intake, evidence-aware review, fail-closed execution gating, authentication/RBAC, receipts, replay, audit verification, persistent proof bundles, API boundary controls, and dashboard observability.
 
 This is built as a Forward Deployed Engineering portfolio system: a customer-facing application that turns ambiguous operational requests into structured, reviewable, executable workflows.
 
@@ -12,8 +10,8 @@ Mission Control is:
 
 - a customer-ops execution-control runtime
 - a buyer-demo and production-candidate operational boundary system
-- a runtime for intake, review, execution gating, receipts, replay, audit, and dashboard visibility
-- not production certified until customer security approval, external audit, or equivalent written deployment authorization
+- a runtime for intake, review, execution gating, receipts, replay, audit, proof export, and dashboard visibility
+- not production certified until customer security approval, external review, or equivalent written deployment authorization
 
 See:
 
@@ -25,29 +23,41 @@ See:
 
 ![Mission Control Customer Operations Runtime infographic](assets/mission-control-runtime-infographic.svg)
 
-A 20-40 second GIF should show:
-
-```text
-Dashboard -> request intake -> runtime decision -> review -> receipt -> replay -> audit trail
-```
-
-Recommended path:
+Recommended GIF path:
 
 ```text
 assets/demo-walkthrough.gif
 ```
 
+Recommended capture path:
+
+```text
+Dashboard -> request intake -> runtime decision -> review -> execution -> receipt -> replay -> audit verification -> proof bundle -> dashboard
+```
+
+Run the local walkthrough:
+
+```bash
+docker compose up --build
+python scripts/local_demo_walkthrough.py
+```
+
+Full demo instructions:
+
+- `docs/local-demo-walkthrough.md`
+
 ## Why this system matters
 
-Customer operations often fail at the boundary between approval and execution. A request may look valid at intake, but become unsafe or unauthorized before the action is actually released.
+Customer operations often fail at the boundary between approval and execution. A request may look valid at intake, but become unready before the action is released.
 
 Mission Control makes that boundary explicit:
 
 - removes ambiguity from customer operations
 - evaluates authority, scope, evidence, risk, and review requirements
-- prevents unsafe or unauthorized actions from executing silently
+- prevents unauthorized actions from executing silently
 - creates replayable receipts for operational decisions
-- gives teams a dashboard for intake, review, execution status, audit, and replay
+- verifies audit and proof artifacts
+- gives teams a dashboard for intake, review, execution status, audit, replay, and proof state
 - provides a deployable pattern for high-assurance customer operations
 
 ## Current state
@@ -66,8 +76,12 @@ This repo includes an end-to-end runtime with:
 - persisted receipt endpoint
 - persisted replay endpoints
 - audit trail endpoint
+- audit ledger verification endpoint
+- signed proof bundle export and verification endpoints
 - metrics endpoint
 - correlation ID middleware
+- API body-size controls
+- API rate-limit controls
 - dashboard API
 - Next.js frontend dashboard
 - Docker Compose deployment
@@ -78,7 +92,8 @@ This repo includes an end-to-end runtime with:
 - GitHub Actions CI
 - CodeQL workflow
 - smoke test script
-- end-to-end API test
+- local demo walkthrough script
+- end-to-end API tests
 
 ## Tech stack
 
@@ -87,8 +102,8 @@ Backend: FastAPI, Python 3.11, Pydantic
 Persistence: SQLAlchemy, SQLite local development, PostgreSQL-ready production path
 Frontend: Next.js, React, TypeScript
 Deployment: Docker, Docker Compose
-Testing: pytest, FastAPI TestClient, smoke test script
-Operations: CORS, correlation IDs, structured request logging, metrics endpoint
+Testing: pytest, FastAPI TestClient, smoke test script, local walkthrough script
+Operations: CORS, correlation IDs, structured request logging, metrics endpoint, API boundary controls
 ```
 
 ## Architecture
@@ -110,7 +125,8 @@ FastAPI Operations API
     +--> Controlled Execution Guard
     +--> Receipt Service
     +--> Replay Service
-    +--> Audit Trail
+    +--> Audit Trail + Ledger Verification
+    +--> Proof Bundle Store
     +--> Metrics + Dashboard
     |
     v
@@ -125,12 +141,14 @@ customer
   -> request intake
   -> persisted request
   -> runtime decision
+  -> evidence manifest
   -> review action
   -> controlled execution
   -> receipt
   -> same-condition replay
   -> changed-condition replay
-  -> audit trail
+  -> audit ledger verification
+  -> proof bundle verification
   -> dashboard
 ```
 
@@ -138,17 +156,17 @@ customer
 
 ### Scenario
 
-Customer requests emergency access to a production system.
+Customer requests a time-bound operational exception.
 
 ### Intake JSON
 
 ```json
 {
   "customer_id": "demo-customer",
-  "workflow_id": "security-exception",
-  "request_id": "REQ-PROD-ACCESS-001",
-  "requested_action": "grant_emergency_production_access",
-  "business_context": "On-call engineer needs temporary production access to resolve an active incident.",
+  "workflow_id": "operations-exception",
+  "request_id": "REQ-OPS-001",
+  "requested_action": "approve_time_bound_operations_exception",
+  "business_context": "Operator requests a temporary exception for a defined workflow condition.",
   "authority_present": true,
   "scope_matched": true,
   "evidence_present": true,
@@ -156,7 +174,7 @@ Customer requests emergency access to a production system.
   "risk_level": "critical",
   "approval_required": true,
   "metadata": {
-    "incident_id": "INC-1042",
+    "case_id": "CASE-1042",
     "requested_duration_minutes": 30
   }
 }
@@ -166,34 +184,19 @@ Customer requests emergency access to a production system.
 
 ```text
 1. Request submitted
-2. Runtime detects critical risk
+2. Runtime detects elevated risk
 3. Outcome: ESCALATE
 4. Lifecycle status: pending_approval
-5. Reviewer approves
-6. Lifecycle status: approved_for_execution
-7. Controlled execution endpoint releases the action
-8. Receipt generated
-9. Same-condition replay matches
-10. Changed-condition replay refuses inherited authorization posture
-11. Audit trail records evaluation, review, execution, receipt, and replay
-```
-
-### Expected decision
-
-```json
-{
-  "outcome": "ESCALATE",
-  "protected_effect_status": "PENDING_HIGH_AUTHORITY_REVIEW",
-  "no_bind_status": true,
-  "reason_codes": [
-    "AUTHORITY_PRESENT",
-    "SCOPE_MATCHED",
-    "EVIDENCE_PRESENT",
-    "EVIDENCE_FRESH",
-    "RISK_CRITICAL",
-    "CRITICAL_RISK_ESCALATION"
-  ]
-}
+5. Evidence attached
+6. Reviewer approves
+7. Lifecycle status: approved_for_execution
+8. Controlled execution endpoint releases the action
+9. Receipt generated
+10. Same-condition replay matches
+11. Changed-condition replay refuses inherited authorization posture
+12. Audit ledger verifies
+13. Proof bundle verifies
+14. Dashboard summarizes runtime state
 ```
 
 ## What this system does
@@ -208,7 +211,9 @@ Customer requests emergency access to a production system.
 8. Receipt is generated.
 9. Replay verifies same-condition and changed-condition behavior.
 10. Audit trail records material events.
-11. Dashboard exposes operational state.
+11. Audit ledger verification checks event linkage.
+12. Proof bundle export ties request, evidence, decision, receipt, replay, and audit artifacts together.
+13. Dashboard exposes operational state.
 
 ## Example use cases
 
@@ -219,7 +224,7 @@ Customer requests emergency access to a production system.
 - Customer operations
 - Compliance workflows
 - AI-assisted operational decisions
-- Emergency access review
+- Operational exception review
 - Production change approval
 
 ## Forward Deployed Engineering Signals
@@ -233,6 +238,7 @@ Customer requests emergency access to a production system.
 - Controlled execution guard
 - Receipt and replay system
 - Persistent audit trail
+- Signed proof export
 - Dockerized deployment
 - Frontend dashboard
 - Customer discovery docs
@@ -256,30 +262,20 @@ Health: http://localhost:8000/health
 Metrics: http://localhost:8000/metrics
 ```
 
-Expected API health output:
+Run the scripted local walkthrough:
 
-```json
-{
-  "status": "ok",
-  "service": "mission-control-customer-ops-runtime",
-  "mode": "customer-operations-platform"
-}
+```bash
+python scripts/local_demo_walkthrough.py
 ```
 
-In the frontend, click:
-
-```text
-Seed Demo Customer
-```
-
-Then submit a customer request and inspect decision, review action, receipt, replay, audit trail, and dashboard state.
+The walkthrough exercises decision, evidence, review, execution, receipt, replay, audit verification, proof bundle verification, and dashboard state.
 
 ## Quickstart: backend only
 
 ```bash
 cd backend
 python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\\Scripts\\activate
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 python scripts/seed_demo_data.py
 uvicorn app.main:app --reload
@@ -333,22 +329,21 @@ Implemented controls include:
 - Production mode requires trusted ingress.
 - Production mode requires an explicit tenant header.
 - Unsafe production configuration is rejected at startup.
+- Authentication and RBAC protect runtime actions.
+- Request snapshots and evidence manifests are hashed.
+- Receipts are signed and externally verifiable.
+- Audit ledgers are hash-chained and verifiable.
+- Proof bundles are signed and verifiable.
+- API body-size and rate controls protect the API boundary.
 
-All-A hardening still required:
+Remaining production-readiness work includes:
 
-- real authentication
-- RBAC
-- immutable request snapshots
-- evidence manifest integrity
-- signed receipts
-- external receipt verifier
-- tamper-evident audit ledger
-- persistent proof store
-- PostgreSQL CI coverage
-- API rate limiting and body limits
+- distributed limiter or gateway enforcement for multi-instance deployments
 - execution idempotency and final execution checks
-- key management and key rotation
-- monitoring and incident response procedures
+- key management and key rotation procedures
+- PostgreSQL CI coverage
+- monitoring procedures
+- customer deployment approval and external review
 
 ## Core outcomes
 
@@ -365,13 +360,11 @@ Run the readiness checker in report mode:
 python scripts/check_deployment_readiness.py
 ```
 
-Run it in strict mode when the all-A hardening package is expected to be complete:
+Run it in strict mode when the remaining production-readiness package is expected to be complete:
 
 ```bash
 python scripts/check_deployment_readiness.py --strict
 ```
-
-The checker intentionally tracks missing all-A items until the implementation work is complete.
 
 ## Future extensions
 
@@ -381,8 +374,9 @@ The checker intentionally tracks missing all-A items until the implementation wo
 - human-in-the-loop approval queues
 - integration with mission-critical systems
 - policy packs per customer or workflow type
-- signed receipts and tamper-evident evidence manifests
 - deployment profiles for cloud environments
+- distributed proof store
+- production monitoring profile
 
 ## Key docs
 
@@ -393,6 +387,10 @@ The checker intentionally tracks missing all-A items until the implementation wo
 - `docs/operations-runbook.md`
 - `docs/schema-versioning.md`
 - `docs/trusted-ingress-identity.md`
+- `docs/api-security.md`
+- `docs/audit-ledger.md`
+- `docs/persistent-proof-store.md`
+- `docs/local-demo-walkthrough.md`
 - `docs/deployment-evidence-template.md`
 - `docs/release-checklist.md`
 - `docs/customer-discovery.md`
@@ -402,19 +400,11 @@ The checker intentionally tracks missing all-A items until the implementation wo
 
 ## Production hardening roadmap
 
-The remaining all-A production-candidate work is tracked in GitHub issue #27 and includes:
+The remaining production-readiness work is tracked in GitHub issue #27 and includes:
 
-- authentication and protected routes
-- RBAC and endpoint-level permission matrix
-- full tenant isolation across runtime objects
-- immutable request snapshots
-- evidence integrity and manifest digesting
-- signed receipts and external verification
-- tamper-evident audit ledger
-- persistent proof store
 - PostgreSQL production and CI path
-- API hardening
-- execution safety
-- key management
-- monitoring and incident response
+- execution safety and idempotency
+- key management and key rotation
+- monitoring profile
 - deployment certification gate
+- customer-approved storage, retention, and backup policy
