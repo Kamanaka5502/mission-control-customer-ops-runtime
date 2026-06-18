@@ -6,6 +6,7 @@ from app.db_models import AuditEvent, Decision, EvidenceItem, OperationRequest
 from app.models import CustomerRequest, RuntimeDecision
 from app.schemas import EvidenceCreate, OperationsDashboard, RequestCreate, RequestSummary, ReviewAction
 from app.services.audit import record_event
+from app.services.integrity import build_evidence_manifest, build_request_snapshot
 from app.services.policy_gate import evaluate_request
 from app.services.rbac import Actor, get_actor, require_permission
 from app.services.receipt import build_receipt
@@ -33,6 +34,11 @@ def operation_to_customer_request(operation: OperationRequest) -> CustomerReques
 
 def actor_name(actor: Actor) -> str:
     return actor.actor_id or actor.role.value
+
+
+def _latest_integrity_event(events: list[AuditEvent], event_type: str) -> AuditEvent | None:
+    matching = [event for event in events if event.event_type == event_type]
+    return matching[-1] if matching else None
 
 
 @router.post("/requests/evaluate", response_model=RuntimeDecision)
@@ -92,6 +98,16 @@ def create_and_evaluate_request(
     db.add(operation)
     db.add(decision)
     db.commit()
+    db.refresh(operation)
+
+    snapshot = build_request_snapshot(operation)
+    record_event(
+        db,
+        payload.request_id,
+        "request_snapshot_captured",
+        actor=actor_name(actor),
+        detail=snapshot,
+    )
     record_event(db, payload.request_id, "request_evaluated", actor=actor_name(actor), detail={"outcome": outcome.value, "status": lifecycle_status})
 
     return RuntimeDecision(
@@ -267,6 +283,51 @@ def request_audit_trail(
     return db.query(AuditEvent).filter(AuditEvent.request_id == request_id).order_by(AuditEvent.created_at.asc()).all()
 
 
+@router.get("/requests/{request_id}/integrity")
+def request_integrity_report(
+    request_id: str,
+    db: Session = Depends(get_db),
+    actor: Actor = Depends(get_actor),
+    tenant_id: str | None = Depends(get_tenant_id),
+):
+    require_permission(actor, "audit:read")
+
+    operation = get_request_for_tenant(db, request_id, tenant_id)
+    evidence_items = db.query(EvidenceItem).filter(EvidenceItem.request_id == request_id).order_by(EvidenceItem.id.asc()).all()
+    events = db.query(AuditEvent).filter(AuditEvent.request_id == request_id).order_by(AuditEvent.created_at.asc()).all()
+
+    current_snapshot = build_request_snapshot(operation)
+    current_manifest = build_evidence_manifest(evidence_items)
+    captured_snapshot_event = _latest_integrity_event(events, "request_snapshot_captured")
+    captured_manifest_event = _latest_integrity_event(events, "evidence_manifest_captured")
+
+    captured_snapshot_hash = None
+    if captured_snapshot_event:
+        captured_snapshot_hash = (captured_snapshot_event.detail or {}).get("snapshot_hash")
+
+    captured_manifest_hash = None
+    if captured_manifest_event:
+        captured_manifest_hash = (captured_manifest_event.detail or {}).get("manifest_hash")
+
+    return {
+        "request_id": request_id,
+        "request_snapshot": {
+            "captured_hash": captured_snapshot_hash,
+            "current_hash": current_snapshot["snapshot_hash"],
+            "match": captured_snapshot_hash == current_snapshot["snapshot_hash"],
+            "captured": captured_snapshot_hash is not None,
+        },
+        "evidence_manifest": {
+            "captured_hash": captured_manifest_hash,
+            "current_hash": current_manifest["manifest_hash"],
+            "match": captured_manifest_hash == current_manifest["manifest_hash"] if captured_manifest_hash else current_manifest["manifest"]["evidence_count"] == 0,
+            "captured": captured_manifest_hash is not None,
+            "evidence_count": current_manifest["manifest"]["evidence_count"],
+        },
+        "integrity_status": "VERIFIED" if captured_snapshot_hash == current_snapshot["snapshot_hash"] and (captured_manifest_hash == current_manifest["manifest_hash"] if captured_manifest_hash else current_manifest["manifest"]["evidence_count"] == 0) else "REVIEW_REQUIRED",
+    }
+
+
 @router.post("/evidence")
 def attach_evidence(
     payload: EvidenceCreate,
@@ -290,7 +351,11 @@ def attach_evidence(
     db.add(evidence)
     db.commit()
     db.refresh(evidence)
+
+    evidence_items = db.query(EvidenceItem).filter(EvidenceItem.request_id == payload.request_id).order_by(EvidenceItem.id.asc()).all()
+    manifest = build_evidence_manifest(evidence_items)
     record_event(db, payload.request_id, "evidence_attached", actor=actor_name(actor), detail={"evidence_id": payload.id, "label": payload.label})
+    record_event(db, payload.request_id, "evidence_manifest_captured", actor=actor_name(actor), detail=manifest)
     return evidence
 
 
