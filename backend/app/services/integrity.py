@@ -9,7 +9,7 @@ from app.db_models import EvidenceItem, OperationRequest
 INTEGRITY_HASH_ALGORITHM = "sha256"
 REQUEST_SNAPSHOT_VERSION = "request-snapshot-v1"
 EVIDENCE_MANIFEST_VERSION = "evidence-manifest-v1"
-INTERNAL_METADATA_KEYS = {"audit_ledger_head"}
+INTERNAL_METADATA_KEYS = {"audit_ledger_head", "execution_control"}
 
 
 def _normalize(value: Any) -> Any:
