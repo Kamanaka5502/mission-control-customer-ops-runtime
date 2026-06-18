@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.db_models import AuditEvent
-from app.services.audit import verify_audit_ledger
+from app.services.audit import audit_head_anchor, verify_audit_ledger
 from app.services.rbac import Actor, get_actor, require_permission
 from app.services.tenant_guard import get_request_for_tenant, get_tenant_id
 
@@ -18,9 +18,14 @@ def verify_request_audit_ledger(
     tenant_id: str | None = Depends(get_tenant_id),
 ):
     require_permission(actor, "audit:read")
-    get_request_for_tenant(db, request_id, tenant_id)
+    operation = get_request_for_tenant(db, request_id, tenant_id)
+    anchor = audit_head_anchor(operation) or {}
     events = db.query(AuditEvent).filter(AuditEvent.request_id == request_id).order_by(AuditEvent.created_at.asc(), AuditEvent.id.asc()).all()
     return {
         "request_id": request_id,
-        "audit_ledger": verify_audit_ledger(events),
+        "audit_ledger": verify_audit_ledger(
+            events,
+            expected_head_hash=anchor.get("head_hash"),
+            expected_event_count=anchor.get("event_count"),
+        ),
     }
