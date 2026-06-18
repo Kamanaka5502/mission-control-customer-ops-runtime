@@ -203,11 +203,11 @@ def require_trusted_ingress(x_ingress_verified: str | None):
 
 
 def get_actor(
-    authorization: str | None = Header(default=None),
     x_actor_role: str | None = Header(default=None),
+    x_ingress_verified: str | None = Header(default=None),
+    authorization: str | None = Header(default=None),
     x_actor_id: str | None = Header(default=None),
     x_actor_scopes: str | None = Header(default=None),
-    x_ingress_verified: str | None = Header(default=None),
 ) -> Actor:
     require_trusted_ingress(x_ingress_verified)
 
@@ -242,18 +242,18 @@ def get_actor(
 
 
 def get_actor_role(
-    authorization: str | None = Header(default=None),
     x_actor_role: str | None = Header(default=None),
+    x_ingress_verified: str | None = Header(default=None),
+    authorization: str | None = Header(default=None),
     x_actor_id: str | None = Header(default=None),
     x_actor_scopes: str | None = Header(default=None),
-    x_ingress_verified: str | None = Header(default=None),
 ) -> Role:
     return get_actor(
-        authorization=authorization,
         x_actor_role=x_actor_role,
+        x_ingress_verified=x_ingress_verified,
+        authorization=authorization,
         x_actor_id=x_actor_id,
         x_actor_scopes=x_actor_scopes,
-        x_ingress_verified=x_ingress_verified,
     ).role
 
 
