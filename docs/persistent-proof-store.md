@@ -11,12 +11,14 @@ The bundle includes:
 - request snapshot
 - evidence manifest
 - decision record
-- signed receipt
+- originally issued signed receipt
 - receipt verification result
 - same-condition replay result
+- audit event records
 - audit ledger verification result
 - integrity status
 - proof hash
+- proof signature
 
 ## API
 
@@ -46,25 +48,25 @@ By default, proof bundles are stored under:
 var/proof_store
 ```
 
-Override with:
-
-```bash
-PROOF_STORE_PATH=/path/to/proof-store
-```
+Proof bundle file names are derived from a SHA-256 digest of the request id. Request ids used for proof-store paths are restricted to safe filename characters.
 
 ## Standalone verifier
 
 Use:
 
 ```bash
-python scripts/verify_proof_bundle.py var/proof_store/REQ-123.proof.json
+python scripts/verify_proof_bundle.py var/proof_store/<proof-bundle-file>.proof.json
 ```
 
 The verifier checks:
 
 - proof hash
+- proof signature
 - receipt signature
-- audit ledger validity
+- receipt consistency with the stored decision token
+- request snapshot hash
+- evidence manifest hash
+- recomputed audit ledger validity
 - request snapshot match
 - evidence manifest match
 - same-condition replay match
