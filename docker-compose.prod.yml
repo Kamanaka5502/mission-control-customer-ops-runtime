@@ -24,8 +24,12 @@ services:
       REQUIRE_TRUSTED_INGRESS: "true"
       AUTH_REQUIRED: "true"
       AUTH_TOKEN_SECRET: ${AUTH_TOKEN_SECRET:?AUTH_TOKEN_SECRET is required}
+      RECEIPT_SIGNING_SECRET: ${RECEIPT_SIGNING_SECRET:?RECEIPT_SIGNING_SECRET is required}
       CORS_ALLOW_ORIGINS: ${CORS_ALLOW_ORIGINS:?CORS_ALLOW_ORIGINS is required}
       DATABASE_URL: postgresql+psycopg://mission_control:${POSTGRES_PASSWORD}@postgres:5432/mission_control
+      MAX_REQUEST_BODY_BYTES: ${MAX_REQUEST_BODY_BYTES:-262144}
+      RATE_LIMIT_REQUESTS: ${RATE_LIMIT_REQUESTS:-120}
+      RATE_LIMIT_WINDOW_SECONDS: ${RATE_LIMIT_WINDOW_SECONDS:-60}
     depends_on:
       postgres:
         condition: service_healthy
