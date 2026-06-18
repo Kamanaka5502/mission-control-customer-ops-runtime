@@ -56,14 +56,12 @@ Mission Control should only be described as a production-candidate runtime when 
 
 Mission Control must not claim:
 
-- full dimensional Elyria/VERITA stack custody
-- true-zero formation custody
-- full consequence-boundary authority
-- production certification before audit, customer approval, or equivalent security review
+- production certification before audit, customer approval, or equivalent written review
 - legal, medical, financial, or regulated authority
 - customer deployment readiness without written scope and deployment evidence
-- private Elyria/VERITA kernel exposure
-- that unfinished roadmap items are implemented
+- implementation of unfinished roadmap items
+- guarantees not backed by code, tests, and operating evidence
+- external deployment readiness before configuration, monitoring, rollback, and incident-response gates are complete
 
 ## What Mission Control proves
 
@@ -86,10 +84,8 @@ This repository does not, by itself, prove:
 - full production certification
 - full external deployment hardening
 - full identity-provider integration
-- full customer security approval
+- full customer approval
 - full legal, medical, or financial authority
-- full Elyria/VERITA kernel protection
-- dimensional consequence-boundary custody
 - complete proof-chain custody without signed receipts and tamper-evident audit ledger implementation
 
 ## README language rule
