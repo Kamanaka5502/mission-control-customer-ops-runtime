@@ -109,12 +109,7 @@ def create_auth_token(
     expires_at: int | None = None,
     secret: str | None = None,
 ) -> str:
-    """Create a signed bearer token for tests, local demos, and service accounts.
-
-    This is intentionally compact: payload JSON plus HMAC-SHA256 signature. It
-    avoids trusting app memory and lets tests verify protected-route behavior
-    without a full external identity provider.
-    """
+    """Create a signed bearer token for tests, local demos, and service accounts."""
 
     key = (secret if secret is not None else signing_secret()).encode("utf-8")
     if not key:
@@ -238,22 +233,20 @@ def get_actor(
     )
 
 
-def get_actor_role(actor: Actor = None) -> Role:
-    # FastAPI dependency-compatible wrapper. The default None is only for direct
-    # calls in tests; route injection should call get_actor_role via Depends.
-    if actor is None:
-        raise HTTPException(status_code=500, detail="Actor dependency not resolved")
-    return actor.role
-
-
-def get_actor_role_dependency(
-    actor: Actor = Header(default=None),
-):
-    return actor.role
-
-
-def role_from_actor(actor: Actor) -> Role:
-    return actor.role
+def get_actor_role(
+    authorization: str | None = Header(default=None),
+    x_actor_role: str | None = Header(default=None),
+    x_actor_id: str | None = Header(default=None),
+    x_actor_scopes: str | None = Header(default=None),
+    x_ingress_verified: str | None = Header(default=None),
+) -> Role:
+    return get_actor(
+        authorization=authorization,
+        x_actor_role=x_actor_role,
+        x_actor_id=x_actor_id,
+        x_actor_scopes=x_actor_scopes,
+        x_ingress_verified=x_ingress_verified,
+    ).role
 
 
 def require_role(role: Role, allowed: set[Role]):
