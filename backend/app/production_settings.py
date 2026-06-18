@@ -2,19 +2,11 @@ import os
 from dataclasses import dataclass
 from urllib.parse import urlparse
 
+from app.services.key_management import validate_key_settings
+
 
 TRUE_VALUES = {"1", "true", "yes", "on"}
 LOCAL_CORS_HOSTS = {"localhost", "127.0.0.1", "0.0.0.0", "::1"}
-DEFAULT_SECRET_VALUES = {
-    "",
-    "change-me",
-    "changeme",
-    "dev-secret",
-    "default",
-    "secret",
-    "replace_with_32_plus_character_random_secret",
-    "development-receipt-secret-not-for-production",
-}
 
 
 @dataclass(frozen=True)
@@ -44,11 +36,6 @@ def is_local_cors_origin(origin: str) -> bool:
     return host in LOCAL_CORS_HOSTS
 
 
-def valid_auth_secret(value: str | None) -> bool:
-    secret = (value or "").strip()
-    return secret.lower() not in DEFAULT_SECRET_VALUES and len(secret) >= 32
-
-
 def validate_production_settings() -> None:
     if not production_mode():
         return
@@ -71,11 +58,7 @@ def validate_production_settings() -> None:
     if not enabled(os.getenv("AUTH_REQUIRED")):
         issues.append("AUTH_REQUIRED must be enabled")
 
-    if not valid_auth_secret(os.getenv("AUTH_TOKEN_SECRET")):
-        issues.append("AUTH_TOKEN_SECRET must be set to a non-default value of at least 32 characters")
-
-    if not valid_auth_secret(os.getenv("RECEIPT_SIGNING_SECRET")):
-        issues.append("RECEIPT_SIGNING_SECRET must be set to a non-default value of at least 32 characters")
+    issues.extend(validate_key_settings())
 
     if not cors_origins:
         issues.append("CORS_ALLOW_ORIGINS must be explicit")
