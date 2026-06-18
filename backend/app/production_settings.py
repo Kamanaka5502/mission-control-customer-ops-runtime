@@ -5,7 +5,15 @@ from urllib.parse import urlparse
 
 TRUE_VALUES = {"1", "true", "yes", "on"}
 LOCAL_CORS_HOSTS = {"localhost", "127.0.0.1", "0.0.0.0", "::1"}
-DEFAULT_SECRET_VALUES = {"", "change-me", "changeme", "dev-secret", "default", "secret"}
+DEFAULT_SECRET_VALUES = {
+    "",
+    "change-me",
+    "changeme",
+    "dev-secret",
+    "default",
+    "secret",
+    "replace_with_32_plus_character_random_secret",
+}
 
 
 @dataclass(frozen=True)
