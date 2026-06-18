@@ -13,7 +13,6 @@ Mission Control is:
 - a customer-ops execution-control runtime
 - a buyer-demo and production-candidate operational boundary system
 - a runtime for intake, review, execution gating, receipts, replay, audit, and dashboard visibility
-- not the full dimensional Elyria / VERITA stack
 - not production certified until customer security approval, external audit, or equivalent written deployment authorization
 
 See:
@@ -49,11 +48,11 @@ Mission Control makes that boundary explicit:
 - prevents unsafe or unauthorized actions from executing silently
 - creates replayable receipts for operational decisions
 - gives teams a dashboard for intake, review, execution status, audit, and replay
-- provides a deployable pattern for high-assurance AI-assisted operations
+- provides a deployable pattern for high-assurance customer operations
 
 ## Current state
 
-This repo is no longer only a scaffold. It includes an end-to-end runtime with:
+This repo includes an end-to-end runtime with:
 
 - FastAPI backend
 - SQLAlchemy persistence
@@ -384,15 +383,6 @@ The checker intentionally tracks missing all-A items until the implementation wo
 - policy packs per customer or workflow type
 - signed receipts and tamper-evident evidence manifests
 - deployment profiles for cloud environments
-
-## Related Elyria Repos
-
-- [elyria-mission-control-engine](https://github.com/Kamanaka5502/elyria-mission-control-engine)
-- [elyria-runtime-law](https://github.com/Kamanaka5502/elyria-runtime-law)
-- [veritas-safechange](https://github.com/Kamanaka5502/veritas-safechange)
-- [elyria-clinical-ai-boundary](https://github.com/Kamanaka5502/elyria-clinical-ai-boundary)
-- [elyria-financial-motion-governance](https://github.com/Kamanaka5502/elyria-financial-motion-governance)
-- [national-cyber-boundary](https://github.com/Kamanaka5502/national-cyber-boundary)
 
 ## Key docs
 
