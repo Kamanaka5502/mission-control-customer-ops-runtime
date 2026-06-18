@@ -57,4 +57,5 @@ jobs:
         env:
           POSTGRES_PASSWORD: ci-placeholder
           NEXT_PUBLIC_API_BASE: https://api.example.com
+          CORS_ALLOW_ORIGINS: https://app.example.com
         run: docker compose -f docker-compose.prod.yml config

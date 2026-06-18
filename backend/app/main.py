@@ -3,6 +3,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.database import init_db
 from app.middleware import CorrelationIdMiddleware
+from app.production_settings import validate_production_settings
+from app.security_headers import SecurityHeadersMiddleware
 from app.routes.requests import router as requests_router
 from app.routes.replay import router as replay_router
 from app.routes.health import router as health_router
@@ -19,12 +21,15 @@ def cors_origins() -> list[str]:
     return [origin.strip() for origin in raw.split(",") if origin.strip()]
 
 
+validate_production_settings()
+
 app = FastAPI(
     title="Mission Control: Customer Operations Runtime",
-    version="0.5.0",
+    version="0.6.0",
     description="Customer operations runtime with intake, persistence, review gates, controlled execution, receipts, replay, audit, metrics, dashboard APIs, and production-boundary controls."
 )
 
+app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(CorrelationIdMiddleware)
 app.add_middleware(
     CORSMiddleware,
