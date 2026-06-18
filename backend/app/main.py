@@ -1,6 +1,7 @@
 import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from app.api_security import BodySizeLimitMiddleware, InMemoryRateLimitMiddleware
 from app.database import init_db
 from app.middleware import CorrelationIdMiddleware
 from app.production_settings import validate_production_settings
@@ -32,6 +33,8 @@ app = FastAPI(
 )
 
 app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(InMemoryRateLimitMiddleware)
+app.add_middleware(BodySizeLimitMiddleware)
 app.add_middleware(CorrelationIdMiddleware)
 app.add_middleware(
     CORSMiddleware,
