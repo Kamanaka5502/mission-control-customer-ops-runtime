@@ -9,6 +9,7 @@ from app.db_models import EvidenceItem, OperationRequest
 INTEGRITY_HASH_ALGORITHM = "sha256"
 REQUEST_SNAPSHOT_VERSION = "request-snapshot-v1"
 EVIDENCE_MANIFEST_VERSION = "evidence-manifest-v1"
+INTERNAL_METADATA_KEYS = {"audit_ledger_head"}
 
 
 def _normalize(value: Any) -> Any:
@@ -26,6 +27,10 @@ def stable_hash(payload: dict[str, Any]) -> str:
     return hashlib.sha256(encoded).hexdigest()
 
 
+def _public_request_metadata(metadata: dict[str, Any] | None) -> dict[str, Any]:
+    return {key: value for key, value in dict(metadata or {}).items() if key not in INTERNAL_METADATA_KEYS}
+
+
 def build_request_snapshot(operation: OperationRequest) -> dict[str, Any]:
     snapshot = {
         "snapshot_version": REQUEST_SNAPSHOT_VERSION,
@@ -40,7 +45,7 @@ def build_request_snapshot(operation: OperationRequest) -> dict[str, Any]:
         "evidence_fresh": operation.evidence_fresh,
         "risk_level": operation.risk_level,
         "approval_required": operation.approval_required,
-        "metadata": operation.request_metadata or {},
+        "metadata": _public_request_metadata(operation.request_metadata),
     }
     return {
         "hash_algorithm": INTEGRITY_HASH_ALGORITHM,
