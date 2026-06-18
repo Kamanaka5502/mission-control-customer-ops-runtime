@@ -57,6 +57,8 @@ def test_audit_ledger_verifies_clean_chain():
     body = response.json()
     assert body["audit_ledger"]["valid"] is True
     assert body["audit_ledger"]["event_count"] >= 2
+    assert body["audit_ledger"]["expected_event_count"] == body["audit_ledger"]["event_count"]
+    assert body["audit_ledger"]["expected_head_hash"] == body["audit_ledger"]["head_hash"]
     assert body["audit_ledger"]["failures"] == []
 
 
@@ -79,7 +81,7 @@ def test_audit_ledger_detects_edit():
     assert body["audit_ledger"]["failures"]
 
 
-def test_audit_ledger_detects_delete():
+def test_audit_ledger_detects_middle_delete():
     request_id = create_request()
 
     with SessionLocal() as db:
@@ -94,3 +96,22 @@ def test_audit_ledger_detects_delete():
     body = response.json()
     assert body["audit_ledger"]["valid"] is False
     assert body["audit_ledger"]["failures"]
+
+
+def test_audit_ledger_detects_tail_delete_against_head_anchor():
+    request_id = create_request()
+
+    with SessionLocal() as db:
+        events = db.query(AuditEvent).filter(AuditEvent.request_id == request_id).order_by(AuditEvent.created_at.asc(), AuditEvent.id.asc()).all()
+        assert len(events) >= 2
+        db.delete(events[-1])
+        db.commit()
+
+    response = client.get(f"/ops/requests/{request_id}/audit/verify")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["audit_ledger"]["valid"] is False
+    reasons = {failure.get("reason") for failure in body["audit_ledger"]["failures"]}
+    assert "event_count_mismatch" in reasons
+    assert "head_hash_mismatch" in reasons
