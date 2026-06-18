@@ -10,6 +10,17 @@ from app.models import CustomerRequest, Outcome, Receipt
 SIGNATURE_ALGORITHM = "hmac-sha256"
 DEFAULT_RECEIPT_KEY_ID = "development-receipt-key"
 DEFAULT_RECEIPT_SECRET = "development-receipt-secret-not-for-production"
+REQUIRED_SIGNED_FIELDS = {
+    "request_id",
+    "workflow_id",
+    "requested_action",
+    "outcome",
+    "protected_effect_status",
+    "no_bind_status",
+    "reason_codes",
+    "public_hash",
+    "signature",
+}
 
 
 def stable_hash(payload: dict[str, Any]) -> str:
@@ -102,13 +113,40 @@ def build_receipt(
 
 
 def verify_receipt_signature(receipt: dict[str, Any], *, secret: str | None = None) -> dict[str, Any]:
+    missing_fields = sorted(field for field in REQUIRED_SIGNED_FIELDS if field not in receipt)
+    if missing_fields:
+        return {
+            "valid": False,
+            "hash_matches": False,
+            "signature_matches": False,
+            "reason": "missing_required_signed_fields",
+            "missing_fields": missing_fields,
+            "expected_public_hash": None,
+            "provided_public_hash": str(receipt.get("public_hash") or ""),
+            "signature_algorithm": receipt.get("signature_algorithm"),
+            "signature_key_id": receipt.get("signature_key_id"),
+        }
+
+    no_bind_status = receipt.get("no_bind_status")
+    if not isinstance(no_bind_status, bool):
+        return {
+            "valid": False,
+            "hash_matches": False,
+            "signature_matches": False,
+            "reason": "invalid_no_bind_status",
+            "expected_public_hash": None,
+            "provided_public_hash": str(receipt.get("public_hash") or ""),
+            "signature_algorithm": receipt.get("signature_algorithm"),
+            "signature_key_id": receipt.get("signature_key_id"),
+        }
+
     public_payload = receipt_public_payload(
-        request_id=str(receipt.get("request_id", "")),
-        workflow_id=str(receipt.get("workflow_id", "")),
-        requested_action=str(receipt.get("requested_action", "")),
-        outcome=str(receipt.get("outcome", "")),
-        effect_status=str(receipt.get("protected_effect_status", "")),
-        no_bind=bool(receipt.get("no_bind_status")),
+        request_id=str(receipt["request_id"]),
+        workflow_id=str(receipt["workflow_id"]),
+        requested_action=str(receipt["requested_action"]),
+        outcome=str(receipt["outcome"]),
+        effect_status=str(receipt["protected_effect_status"]),
+        no_bind=no_bind_status,
         reason_codes=list(receipt.get("reason_codes") or []),
         request_snapshot_hash=receipt.get("request_snapshot_hash"),
         evidence_manifest_hash=receipt.get("evidence_manifest_hash"),
