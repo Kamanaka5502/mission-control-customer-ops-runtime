@@ -14,6 +14,7 @@ from app.routes.operations import router as operations_router
 from app.routes.audit_ledger import router as audit_ledger_router
 from app.routes.proof_store import router as proof_store_router
 from app.routes.metrics import router as metrics_router
+from app.routes.monitoring import router as monitoring_router
 from app.routes.jobs import router as jobs_router
 
 
@@ -28,8 +29,8 @@ validate_production_settings()
 
 app = FastAPI(
     title="Mission Control: Customer Operations Runtime",
-    version="0.7.0",
-    description="Customer operations runtime with intake, persistence, review gates, controlled execution, receipts, replay, audit, metrics, dashboard APIs, production-boundary controls, authentication, and RBAC."
+    version="0.8.0",
+    description="Customer operations runtime with intake, persistence, review gates, controlled execution, receipts, replay, audit, metrics, dashboard APIs, production-boundary controls, authentication, RBAC, and monitoring profile."
 )
 
 app.add_middleware(SecurityHeadersMiddleware)
@@ -52,6 +53,7 @@ def startup():
 
 app.include_router(health_router, tags=["health"])
 app.include_router(metrics_router, tags=["metrics"])
+app.include_router(monitoring_router, tags=["monitoring"])
 app.include_router(customers_router, prefix="/ops", tags=["customers-workflows"])
 app.include_router(operations_router, prefix="/ops", tags=["operations"])
 app.include_router(audit_ledger_router, prefix="/ops", tags=["audit-ledger"])
