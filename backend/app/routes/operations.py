@@ -1,14 +1,15 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+
 from app.database import get_db
-from app.db_models import OperationRequest, Decision, EvidenceItem, Workflow, AuditEvent
+from app.db_models import AuditEvent, Decision, EvidenceItem, OperationRequest
 from app.models import CustomerRequest, RuntimeDecision
-from app.schemas import RequestCreate, EvidenceCreate, ReviewAction, OperationsDashboard, RequestSummary
-from app.services.policy_gate import evaluate_request
-from app.services.receipt import build_receipt
+from app.schemas import EvidenceCreate, OperationsDashboard, RequestCreate, RequestSummary, ReviewAction
 from app.services.audit import record_event
-from app.services.rbac import Role, get_actor_role, require_role
-from app.services.tenant_guard import get_tenant_id, get_request_for_tenant, get_workflow_for_tenant, require_tenant_access
+from app.services.policy_gate import evaluate_request
+from app.services.rbac import Actor, get_actor, require_permission
+from app.services.receipt import build_receipt
+from app.services.tenant_guard import get_request_for_tenant, get_tenant_id, get_workflow_for_tenant, require_tenant_access
 
 router = APIRouter()
 
@@ -30,14 +31,18 @@ def operation_to_customer_request(operation: OperationRequest) -> CustomerReques
     )
 
 
+def actor_name(actor: Actor) -> str:
+    return actor.actor_id or actor.role.value
+
+
 @router.post("/requests/evaluate", response_model=RuntimeDecision)
 def create_and_evaluate_request(
     payload: RequestCreate,
     db: Session = Depends(get_db),
-    role: Role = Depends(get_actor_role),
+    actor: Actor = Depends(get_actor),
     tenant_id: str | None = Depends(get_tenant_id),
 ):
-    require_role(role, {Role.ADMIN, Role.OPERATOR})
+    require_permission(actor, "request:create")
     require_tenant_access(payload.customer_id, tenant_id)
 
     get_workflow_for_tenant(db, payload.workflow_id, tenant_id)
@@ -87,7 +92,7 @@ def create_and_evaluate_request(
     db.add(operation)
     db.add(decision)
     db.commit()
-    record_event(db, payload.request_id, "request_evaluated", actor=role.value, detail={"outcome": outcome.value, "status": lifecycle_status})
+    record_event(db, payload.request_id, "request_evaluated", actor=actor_name(actor), detail={"outcome": outcome.value, "status": lifecycle_status})
 
     return RuntimeDecision(
         request_id=payload.request_id,
@@ -105,10 +110,10 @@ def create_and_evaluate_request(
 @router.get("/requests")
 def list_requests(
     db: Session = Depends(get_db),
-    role: Role = Depends(get_actor_role),
+    actor: Actor = Depends(get_actor),
     tenant_id: str | None = Depends(get_tenant_id),
 ):
-    require_role(role, {Role.ADMIN, Role.REVIEWER, Role.OPERATOR, Role.AUDITOR})
+    require_permission(actor, "request:read")
     query = db.query(OperationRequest).order_by(OperationRequest.created_at.desc())
     if tenant_id:
         query = query.filter(OperationRequest.customer_id == tenant_id)
@@ -119,10 +124,10 @@ def list_requests(
 def get_request(
     request_id: str,
     db: Session = Depends(get_db),
-    role: Role = Depends(get_actor_role),
+    actor: Actor = Depends(get_actor),
     tenant_id: str | None = Depends(get_tenant_id),
 ):
-    require_role(role, {Role.ADMIN, Role.REVIEWER, Role.OPERATOR, Role.AUDITOR})
+    require_permission(actor, "request:read")
     return get_request_for_tenant(db, request_id, tenant_id)
 
 
@@ -130,10 +135,10 @@ def get_request(
 def execute_request(
     request_id: str,
     db: Session = Depends(get_db),
-    role: Role = Depends(get_actor_role),
+    actor: Actor = Depends(get_actor),
     tenant_id: str | None = Depends(get_tenant_id),
 ):
-    require_role(role, {Role.ADMIN, Role.OPERATOR})
+    require_permission(actor, "execution:run")
 
     operation = get_request_for_tenant(db, request_id, tenant_id)
     decision = db.query(Decision).filter(Decision.request_id == request_id).first()
@@ -141,21 +146,21 @@ def execute_request(
         raise HTTPException(status_code=404, detail="Decision not found")
 
     if decision.outcome == "REFUSE":
-        record_event(db, request_id, "execution_blocked", actor=role.value, detail={"status": operation.lifecycle_status, "outcome": decision.outcome})
+        record_event(db, request_id, "execution_blocked", actor=actor_name(actor), detail={"status": operation.lifecycle_status, "outcome": decision.outcome})
         raise HTTPException(status_code=409, detail={"execution_status": "BLOCKED", "reason": "Closed request is not releasable."})
 
     allowed_statuses = {"ready_to_execute", "approved_for_execution"}
     if operation.lifecycle_status not in allowed_statuses:
-        record_event(db, request_id, "execution_blocked", actor=role.value, detail={"status": operation.lifecycle_status, "outcome": decision.outcome})
+        record_event(db, request_id, "execution_blocked", actor=actor_name(actor), detail={"status": operation.lifecycle_status, "outcome": decision.outcome})
         raise HTTPException(status_code=409, detail={"execution_status": "BLOCKED", "reason": "Request is not in an executable lifecycle state."})
 
     if decision.outcome != "ADMIT" and operation.lifecycle_status != "approved_for_execution":
-        record_event(db, request_id, "execution_blocked", actor=role.value, detail={"status": operation.lifecycle_status, "outcome": decision.outcome})
+        record_event(db, request_id, "execution_blocked", actor=actor_name(actor), detail={"status": operation.lifecycle_status, "outcome": decision.outcome})
         raise HTTPException(status_code=409, detail={"execution_status": "BLOCKED", "reason": "Runtime decision is not executable without review approval."})
 
     operation.lifecycle_status = "executed"
     db.commit()
-    record_event(db, request_id, "execution_completed", actor=role.value, detail={"requested_action": operation.requested_action})
+    record_event(db, request_id, "execution_completed", actor=actor_name(actor), detail={"requested_action": operation.requested_action})
     return {
         "request_id": request_id,
         "execution_status": "EXECUTED",
@@ -168,10 +173,10 @@ def execute_request(
 def persisted_receipt(
     request_id: str,
     db: Session = Depends(get_db),
-    role: Role = Depends(get_actor_role),
+    actor: Actor = Depends(get_actor),
     tenant_id: str | None = Depends(get_tenant_id),
 ):
-    require_role(role, {Role.ADMIN, Role.REVIEWER, Role.OPERATOR, Role.AUDITOR})
+    require_permission(actor, "receipt:read")
 
     operation = get_request_for_tenant(db, request_id, tenant_id)
     decision = db.query(Decision).filter(Decision.request_id == request_id).first()
@@ -186,7 +191,7 @@ def persisted_receipt(
         decision.no_bind_status,
         decision.reason_codes,
     )
-    record_event(db, request_id, "receipt_viewed", actor=role.value, detail={"receipt_id": receipt.receipt_id})
+    record_event(db, request_id, "receipt_viewed", actor=actor_name(actor), detail={"receipt_id": receipt.receipt_id})
     return receipt
 
 
@@ -194,10 +199,10 @@ def persisted_receipt(
 def persisted_same_condition_replay(
     request_id: str,
     db: Session = Depends(get_db),
-    role: Role = Depends(get_actor_role),
+    actor: Actor = Depends(get_actor),
     tenant_id: str | None = Depends(get_tenant_id),
 ):
-    require_role(role, {Role.ADMIN, Role.REVIEWER, Role.OPERATOR, Role.AUDITOR})
+    require_permission(actor, "replay:run")
 
     operation = get_request_for_tenant(db, request_id, tenant_id)
     prior = db.query(Decision).filter(Decision.request_id == request_id).first()
@@ -206,7 +211,7 @@ def persisted_same_condition_replay(
 
     req_model = operation_to_customer_request(operation)
     outcome, effect_status, no_bind, reason_codes = evaluate_request(req_model)
-    record_event(db, request_id, "same_condition_replay", actor=role.value, detail={"observed_outcome": outcome.value})
+    record_event(db, request_id, "same_condition_replay", actor=actor_name(actor), detail={"observed_outcome": outcome.value})
     return {
         "request_id": request_id,
         "replay_type": "same_condition",
@@ -223,10 +228,10 @@ def persisted_same_condition_replay(
 def persisted_changed_condition_replay(
     request_id: str,
     db: Session = Depends(get_db),
-    role: Role = Depends(get_actor_role),
+    actor: Actor = Depends(get_actor),
     tenant_id: str | None = Depends(get_tenant_id),
 ):
-    require_role(role, {Role.ADMIN, Role.REVIEWER, Role.OPERATOR, Role.AUDITOR})
+    require_permission(actor, "replay:run")
 
     operation = get_request_for_tenant(db, request_id, tenant_id)
 
@@ -236,7 +241,7 @@ def persisted_changed_condition_replay(
     changed.risk_level = "high"
 
     outcome, effect_status, no_bind, reason_codes = evaluate_request(changed)
-    record_event(db, request_id, "changed_condition_replay", actor=role.value, detail={"observed_outcome": outcome.value})
+    record_event(db, request_id, "changed_condition_replay", actor=actor_name(actor), detail={"observed_outcome": outcome.value})
     return {
         "request_id": request_id,
         "replay_type": "changed_condition",
@@ -253,10 +258,10 @@ def persisted_changed_condition_replay(
 def request_audit_trail(
     request_id: str,
     db: Session = Depends(get_db),
-    role: Role = Depends(get_actor_role),
+    actor: Actor = Depends(get_actor),
     tenant_id: str | None = Depends(get_tenant_id),
 ):
-    require_role(role, {Role.ADMIN, Role.REVIEWER, Role.AUDITOR})
+    require_permission(actor, "audit:read")
 
     get_request_for_tenant(db, request_id, tenant_id)
     return db.query(AuditEvent).filter(AuditEvent.request_id == request_id).order_by(AuditEvent.created_at.asc()).all()
@@ -266,10 +271,10 @@ def request_audit_trail(
 def attach_evidence(
     payload: EvidenceCreate,
     db: Session = Depends(get_db),
-    role: Role = Depends(get_actor_role),
+    actor: Actor = Depends(get_actor),
     tenant_id: str | None = Depends(get_tenant_id),
 ):
-    require_role(role, {Role.ADMIN, Role.OPERATOR})
+    require_permission(actor, "evidence:attach")
 
     get_request_for_tenant(db, payload.request_id, tenant_id)
 
@@ -285,7 +290,7 @@ def attach_evidence(
     db.add(evidence)
     db.commit()
     db.refresh(evidence)
-    record_event(db, payload.request_id, "evidence_attached", actor=role.value, detail={"evidence_id": payload.id, "label": payload.label})
+    record_event(db, payload.request_id, "evidence_attached", actor=actor_name(actor), detail={"evidence_id": payload.id, "label": payload.label})
     return evidence
 
 
@@ -294,10 +299,10 @@ def review_request(
     request_id: str,
     payload: ReviewAction,
     db: Session = Depends(get_db),
-    role: Role = Depends(get_actor_role),
+    actor: Actor = Depends(get_actor),
     tenant_id: str | None = Depends(get_tenant_id),
 ):
-    require_role(role, {Role.ADMIN, Role.REVIEWER})
+    require_permission(actor, "review:write")
 
     req = get_request_for_tenant(db, request_id, tenant_id)
     decision = db.query(Decision).filter(Decision.request_id == request_id).first()
@@ -305,7 +310,7 @@ def review_request(
         raise HTTPException(status_code=404, detail="Decision not found")
 
     if payload.decision == "approve" and decision.outcome == "REFUSE":
-        record_event(db, request_id, "review_blocked", actor=payload.actor or role.value, detail={"decision": payload.decision, "outcome": decision.outcome})
+        record_event(db, request_id, "review_blocked", actor=payload.actor or actor_name(actor), detail={"decision": payload.decision, "outcome": decision.outcome})
         raise HTTPException(status_code=409, detail={"review_status": "BLOCKED", "reason": "Closed request is not approvable."})
 
     next_status = {
@@ -317,17 +322,17 @@ def review_request(
 
     req.lifecycle_status = next_status
     db.commit()
-    record_event(db, request_id, "review_action", actor=payload.actor or role.value, detail={"decision": payload.decision, "notes": payload.notes})
+    record_event(db, request_id, "review_action", actor=payload.actor or actor_name(actor), detail={"decision": payload.decision, "notes": payload.notes})
     return {"request_id": request_id, "lifecycle_status": next_status}
 
 
 @router.get("/dashboard", response_model=OperationsDashboard)
 def dashboard(
     db: Session = Depends(get_db),
-    role: Role = Depends(get_actor_role),
+    actor: Actor = Depends(get_actor),
     tenant_id: str | None = Depends(get_tenant_id),
 ):
-    require_role(role, {Role.ADMIN, Role.REVIEWER, Role.OPERATOR, Role.AUDITOR})
+    require_permission(actor, "dashboard:read")
 
     requests_query = db.query(OperationRequest).order_by(OperationRequest.created_at.desc())
     decisions_query = db.query(Decision).join(OperationRequest, Decision.request_id == OperationRequest.id)

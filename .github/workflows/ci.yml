@@ -30,7 +30,17 @@ jobs:
           rm -f /tmp/mission_control_ci.db
           python -m alembic upgrade head
       - name: Run backend tests
-        run: PYTHONPATH=. python -m pytest -q
+        run: |
+          set +e
+          PYTHONPATH=. python -m pytest -q --tb=short | tee /tmp/backend-pytest.log
+          test_status=${PIPESTATUS[0]}
+          exit ${test_status}
+      - name: Upload backend pytest log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-pytest-log
+          path: /tmp/backend-pytest.log
 
   frontend:
     runs-on: ubuntu-latest
@@ -56,6 +66,7 @@ jobs:
       - name: Validate production compose file
         env:
           POSTGRES_PASSWORD: ci-placeholder
+          AUTH_TOKEN_SECRET: 0123456789abcdef0123456789abcdef
           NEXT_PUBLIC_API_BASE: https://api.example.com
           CORS_ALLOW_ORIGINS: https://app.example.com
         run: docker compose -f docker-compose.prod.yml config

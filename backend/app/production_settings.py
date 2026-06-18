@@ -5,6 +5,15 @@ from urllib.parse import urlparse
 
 TRUE_VALUES = {"1", "true", "yes", "on"}
 LOCAL_CORS_HOSTS = {"localhost", "127.0.0.1", "0.0.0.0", "::1"}
+DEFAULT_SECRET_VALUES = {
+    "",
+    "change-me",
+    "changeme",
+    "dev-secret",
+    "default",
+    "secret",
+    "replace_with_32_plus_character_random_secret",
+}
 
 
 @dataclass(frozen=True)
@@ -34,6 +43,11 @@ def is_local_cors_origin(origin: str) -> bool:
     return host in LOCAL_CORS_HOSTS
 
 
+def valid_auth_secret(value: str | None) -> bool:
+    secret = (value or "").strip()
+    return secret.lower() not in DEFAULT_SECRET_VALUES and len(secret) >= 32
+
+
 def validate_production_settings() -> None:
     if not production_mode():
         return
@@ -52,6 +66,12 @@ def validate_production_settings() -> None:
 
     if not enabled(os.getenv("REQUIRE_TRUSTED_INGRESS")):
         issues.append("REQUIRE_TRUSTED_INGRESS must be enabled")
+
+    if not enabled(os.getenv("AUTH_REQUIRED")):
+        issues.append("AUTH_REQUIRED must be enabled")
+
+    if not valid_auth_secret(os.getenv("AUTH_TOKEN_SECRET")):
+        issues.append("AUTH_TOKEN_SECRET must be set to a non-default value of at least 32 characters")
 
     if not cors_origins:
         issues.append("CORS_ALLOW_ORIGINS must be explicit")
