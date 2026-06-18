@@ -52,9 +52,18 @@ def test_production_settings_reject_local_cors_hosts(monkeypatch, origin):
     assert "localhost CORS origins are not allowed" in str(exc.value)
 
 
-def test_production_startup_refuses_default_secret(monkeypatch):
+@pytest.mark.parametrize(
+    "secret",
+    [
+        "change-me",
+        "replace_with_32_plus_character_random_secret",
+        "short-secret",
+        "",
+    ],
+)
+def test_production_startup_refuses_default_or_sample_secret(monkeypatch, secret):
     set_base_production_env(monkeypatch)
-    monkeypatch.setenv("AUTH_TOKEN_SECRET", "change-me")
+    monkeypatch.setenv("AUTH_TOKEN_SECRET", secret)
 
     with pytest.raises(ProductionSettingsError) as exc:
         validate_production_settings()
