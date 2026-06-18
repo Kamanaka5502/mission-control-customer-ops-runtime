@@ -1,119 +1,227 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="720" viewBox="0 0 1400 720" role="img" aria-labelledby="title desc">
-  <title id="title">Mission Control Customer Operations Runtime Infographic</title>
-  <desc id="desc">A visual flow showing customer request intake through runtime decision, review, execution guard, receipt, replay, audit trail, and operations dashboard.</desc>
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1050" viewBox="0 0 1600 1050" role="img" aria-labelledby="title desc">
+  <title id="title">Mission Control: Customer Operations Runtime</title>
+  <desc id="desc">End-to-end operational request lifecycle from intake JSON through policy gate, escalation, higher authority review, approved execution, controlled release, persisted receipt, replay verification, audit trail, and dashboard.</desc>
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#07111f"/>
-      <stop offset="58%" stop-color="#0d1728"/>
-      <stop offset="100%" stop-color="#101827"/>
+    <radialGradient id="bgGlow" cx="50%" cy="35%" r="70%">
+      <stop offset="0%" stop-color="#0b2947" stop-opacity="0.9"/>
+      <stop offset="48%" stop-color="#06182b" stop-opacity="1"/>
+      <stop offset="100%" stop-color="#020814" stop-opacity="1"/>
+    </radialGradient>
+    <linearGradient id="panel" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#08213b" stop-opacity="0.95"/>
+      <stop offset="100%" stop-color="#03101f" stop-opacity="0.96"/>
+    </linearGradient>
+    <linearGradient id="blue" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#1e90ff"/>
+      <stop offset="100%" stop-color="#72c7ff"/>
     </linearGradient>
     <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#f8d987"/>
-      <stop offset="100%" stop-color="#b8892f"/>
+      <stop offset="0%" stop-color="#ffe085"/>
+      <stop offset="100%" stop-color="#d89022"/>
     </linearGradient>
-    <linearGradient id="blue" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#64b5f6"/>
-      <stop offset="100%" stop-color="#2563eb"/>
+    <linearGradient id="green" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#8df17c"/>
+      <stop offset="100%" stop-color="#206b32"/>
     </linearGradient>
     <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
-      <feDropShadow dx="0" dy="12" stdDeviation="16" flood-color="#000000" flood-opacity="0.35"/>
+      <feDropShadow dx="0" dy="12" stdDeviation="14" flood-color="#000" flood-opacity="0.45"/>
     </filter>
     <style>
-      .title { font: 700 44px Arial, sans-serif; fill: #f8fafc; }
-      .subtitle { font: 400 22px Arial, sans-serif; fill: #cbd5e1; }
+      .title { font: 800 56px Arial, sans-serif; fill: #f8fafc; letter-spacing: -1px; }
+      .subtitle { font: 500 28px Arial, sans-serif; fill: #3aa2ff; }
+      .step { font: 800 18px Arial, sans-serif; fill: #f8fafc; }
       .label { font: 700 18px Arial, sans-serif; fill: #f8fafc; }
-      .small { font: 400 14px Arial, sans-serif; fill: #cbd5e1; }
-      .tiny { font: 700 12px Arial, sans-serif; fill: #111827; letter-spacing: .08em; }
-      .node { fill: #111827; stroke: #334155; stroke-width: 2; rx: 22; filter: url(#shadow); }
-      .guard { fill: #1a1427; stroke: #b8892f; stroke-width: 2; rx: 22; filter: url(#shadow); }
-      .line { stroke: #64748b; stroke-width: 4; stroke-linecap: round; }
-      .arrow { fill: #64748b; }
-      .pill { fill: url(#gold); }
-      .pillBlue { fill: url(#blue); }
+      .body { font: 400 15px Arial, sans-serif; fill: #dbeafe; }
+      .small { font: 400 13px Arial, sans-serif; fill: #cbd5e1; }
+      .mono { font: 400 12px Consolas, Menlo, monospace; fill: #dbeafe; }
+      .greenText { fill: #7ee787; font-weight: 700; }
+      .yellowText { fill: #ffd166; font-weight: 800; }
+      .redText { fill: #ff5b5b; font-weight: 800; }
+      .blueText { fill: #38bdf8; font-weight: 800; }
+      .purpleText { fill: #c084fc; font-weight: 800; }
+      .panel { fill: url(#panel); stroke: #1777bd; stroke-width: 1.5; rx: 10; filter: url(#shadow); }
+      .thinPanel { fill: rgba(6,24,43,.86); stroke: #12639e; stroke-width: 1.2; rx: 10; }
+      .arrow { fill: url(#blue); opacity: .9; }
     </style>
   </defs>
 
-  <rect width="1400" height="720" fill="url(#bg)"/>
-  <circle cx="1120" cy="120" r="260" fill="#1d4ed8" opacity="0.08"/>
-  <circle cx="260" cy="620" r="280" fill="#f59e0b" opacity="0.07"/>
-
-  <text x="70" y="80" class="title">Mission Control</text>
-  <text x="70" y="116" class="subtitle">Customer Operations Runtime</text>
-  <text x="70" y="154" class="small">Intake → evaluation → review → controlled execution → receipt → replay → audit evidence</text>
-
-  <rect x="1040" y="58" width="285" height="46" rx="23" class="pill"/>
-  <text x="1070" y="87" class="tiny">FAIL-CLOSED RUNTIME</text>
-
-  <g transform="translate(65,235)">
-    <rect class="node" x="0" y="0" width="150" height="118"/>
-    <text class="label" x="24" y="42">Dashboard</text>
-    <text class="small" x="24" y="72">operator view</text>
-    <text class="small" x="24" y="94">customer state</text>
+  <rect width="1600" height="1050" fill="url(#bgGlow)"/>
+  <g opacity="0.20">
+    <rect x="0" y="120" width="1600" height="930" fill="#00111f"/>
+    <path d="M0 720 C180 640 320 680 500 610 C720 525 880 660 1080 555 C1260 460 1400 520 1600 420 L1600 1050 L0 1050 Z" fill="#0a3158" opacity="0.45"/>
+    <path d="M40 910 H1540 M40 860 H1540 M40 810 H1540 M40 760 H1540" stroke="#0e5b91" stroke-width="1" opacity="0.35"/>
   </g>
 
-  <g transform="translate(245,235)">
-    <rect class="node" x="0" y="0" width="160" height="118"/>
-    <text class="label" x="24" y="42">Request</text>
-    <text class="small" x="24" y="72">intake envelope</text>
-    <text class="small" x="24" y="94">business context</text>
+  <text x="800" y="64" text-anchor="middle" class="title">Mission Control: Customer Operations Runtime</text>
+  <text x="800" y="100" text-anchor="middle" class="subtitle">End-to-End Operational Request Lifecycle</text>
+  <line x1="0" y1="116" x2="1600" y2="116" stroke="#1b75bb" stroke-width="2" opacity="0.55"/>
+
+  <text x="96" y="150" class="step">1. INTAKE JSON</text>
+  <text x="360" y="150" class="step">2. OPERATIONAL</text><text x="376" y="173" class="step">POLICY GATE</text>
+  <text x="585" y="150" class="step">3. ESCALATE</text>
+  <text x="775" y="150" class="step">4. HIGHER AUTHORITY</text><text x="828" y="173" class="step">REVIEW</text>
+  <text x="1014" y="150" class="step">5. APPROVED FOR</text><text x="1038" y="173" class="step">EXECUTION</text>
+  <text x="1220" y="150" class="step">6. CONTROLLED</text><text x="1236" y="173" class="step">RELEASE</text>
+  <text x="1410" y="150" class="step">7. PERSISTED</text><text x="1426" y="173" class="step">RECEIPT</text>
+
+  <rect class="panel" x="38" y="160" width="285" height="390" rx="9"/>
+  <text class="mono" x="55" y="184">{</text>
+  <text class="mono" x="70" y="205">"customers": {</text>
+  <text class="mono" x="84" y="224">"request": null,</text>
+  <text class="mono" x="84" y="243">"id": "grant_emergency_production_access",</text>
+  <text class="mono" x="84" y="262">"name": "INC-1042",</text>
+  <text class="mono" x="84" y="281">"risk": "critical",</text>
+  <text class="mono" x="84" y="300">"risk_score": 95,</text>
+  <text class="mono" x="84" y="319">"priority": "P1"</text>
+  <text class="mono" x="70" y="338">},</text>
+  <text class="mono" x="70" y="357">"data": {</text>
+  <text class="mono" x="84" y="376">"id": 1,</text>
+  <text class="mono" x="84" y="395">"action": [],</text>
+  <text class="mono" x="84" y="414">"status": "pending_critical_process"</text>
+  <text class="mono" x="70" y="433">},</text>
+  <text class="mono" x="70" y="452">"evidence": [</text>
+  <text class="mono" x="84" y="471">{ "type": "text", "content":</text>
+  <text class="mono" x="98" y="490">"outage impacting revenue" },</text>
+  <text class="mono" x="84" y="509">{ "type": "attachment",</text>
+  <text class="mono" x="98" y="528">"hash": "sha256:9f2b...7c1a" }</text>
+  <text class="mono" x="70" y="547">]</text>
+  <text class="mono" x="55" y="566">}</text>
+
+  <polygon class="arrow" points="325,246 360,246 360,225 392,270 360,315 360,294 325,294"/>
+  <polygon class="arrow" points="500,246 535,246 535,225 567,270 535,315 535,294 500,294"/>
+  <polygon class="arrow" points="715,246 760,246 760,225 792,270 760,315 760,294 715,294"/>
+  <polygon class="arrow" points="946,246 1004,246 1004,225 1036,270 1004,315 1004,294 946,294"/>
+  <polygon class="arrow" points="1165,246 1202,246 1202,225 1234,270 1202,315 1202,294 1165,294"/>
+  <polygon class="arrow" points="1324,246 1360,246 1360,225 1392,270 1360,315 1360,294 1324,294"/>
+
+  <circle cx="435" cy="250" r="62" fill="#071426" stroke="#dbeafe" stroke-width="4" filter="url(#shadow)"/>
+  <path d="M389 250 A46 46 0 0 1 415 208" stroke="#3b82f6" stroke-width="14" fill="none"/>
+  <path d="M415 208 A46 46 0 0 1 462 210" stroke="#22c55e" stroke-width="14" fill="none"/>
+  <path d="M462 210 A46 46 0 0 1 480 250" stroke="#f97316" stroke-width="14" fill="none"/>
+  <path d="M480 250 A46 46 0 0 1 462 288" stroke="#ef4444" stroke-width="14" fill="none"/>
+  <line x1="435" y1="250" x2="466" y2="221" stroke="#f8fafc" stroke-width="5" stroke-linecap="round"/>
+  <circle cx="435" cy="250" r="8" fill="#f8fafc"/>
+  <text x="435" y="338" text-anchor="middle" class="body">Runtime Policy</text>
+  <text x="435" y="359" text-anchor="middle" class="body">Evaluation</text>
+  <circle cx="370" cy="383" r="8" fill="#22c55e"/><text x="386" y="388" class="body">Authority</text>
+  <circle cx="370" cy="405" r="8" fill="#22c55e"/><text x="386" y="410" class="body">Evidence Quality</text>
+  <circle cx="370" cy="427" r="8" fill="#22c55e"/><text x="386" y="432" class="body">Risk Posture</text>
+  <circle cx="370" cy="449" r="8" fill="#22c55e"/><text x="386" y="454" class="body">Conditions</text>
+  <rect class="thinPanel" x="348" y="476" width="170" height="86" rx="8"/>
+  <text x="433" y="512" text-anchor="middle" class="label yellowText">ESCALATE</text>
+  <text x="433" y="538" text-anchor="middle" class="small">PENDING REVIEW</text>
+
+  <rect x="568" y="190" width="155" height="110" rx="10" fill="#3a1010" stroke="#ef4444" stroke-width="2" filter="url(#shadow)"/>
+  <polygon points="646,210 690,280 602,280" fill="#b91c1c" stroke="#fecaca" stroke-width="5"/>
+  <line x1="646" y1="232" x2="646" y2="256" stroke="#fff" stroke-width="8" stroke-linecap="round"/>
+  <circle cx="646" cy="270" r="5" fill="#fff"/>
+  <text x="646" y="332" text-anchor="middle" class="body">High-Risk / High-Impact</text>
+  <text x="646" y="353" text-anchor="middle" class="body">Request Requires</text>
+  <text x="646" y="374" text-anchor="middle" class="body">Higher Authority Review</text>
+  <rect x="553" y="400" width="190" height="95" rx="9" fill="#24080b" stroke="#ef4444" stroke-width="2"/>
+  <text x="648" y="427" text-anchor="middle" class="body">STATUS:</text>
+  <text x="648" y="456" text-anchor="middle" class="redText" font-size="23" font-family="Arial" font-weight="800">PENDING</text>
+  <text x="648" y="482" text-anchor="middle" class="small">HIGH_AUTHORITY_REVIEW</text>
+
+  <circle cx="862" cy="250" r="58" fill="#1f123a" stroke="#a855f7" stroke-width="3" filter="url(#shadow)"/>
+  <circle cx="862" cy="226" r="15" fill="#a855f7"/>
+  <path d="M830 279 C835 255 850 244 862 244 C878 244 895 257 898 279 Z" fill="#a855f7"/>
+  <polygon points="899,250 908,270 930,272 913,286 918,308 899,296 880,308 885,286 868,272 890,270" fill="#f8fafc"/>
+  <text x="862" y="332" text-anchor="middle" class="body">Authorized Reviewer</text>
+  <text x="862" y="353" text-anchor="middle" class="body">Evaluates Request,</text>
+  <text x="862" y="374" text-anchor="middle" class="body">Evidence, and Context</text>
+  <rect x="776" y="402" width="180" height="96" rx="9" fill="#1a1030" stroke="#a855f7" stroke-width="2"/>
+  <text x="866" y="428" text-anchor="middle" class="body">REVIEW OUTCOME:</text>
+  <text x="846" y="468" text-anchor="middle" class="label">APPROVE</text>
+  <path d="M904 462 l13 13 l26 -31" stroke="#f8fafc" stroke-width="5" fill="none" stroke-linecap="round"/>
+
+  <path d="M1080 196 L1125 216 L1125 270 C1120 310 1100 333 1080 345 C1060 333 1040 310 1035 270 L1035 216 Z" fill="url(#green)" stroke="#98f28a" stroke-width="4" filter="url(#shadow)"/>
+  <path d="M1058 265 l22 22 l45 -54" stroke="#eaffea" stroke-width="9" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="1080" y="332" text-anchor="middle" class="body">Request Approved</text>
+  <text x="1080" y="353" text-anchor="middle" class="body">for Controlled</text>
+  <text x="1080" y="374" text-anchor="middle" class="body">Execution</text>
+  <rect x="992" y="402" width="178" height="96" rx="9" fill="#07351b" stroke="#22c55e" stroke-width="2"/>
+  <text x="1081" y="429" text-anchor="middle" class="body">LIFECYCLE:</text>
+  <text x="1081" y="460" text-anchor="middle" class="greenText" font-size="23" font-family="Arial">APPROVED</text>
+  <text x="1081" y="482" text-anchor="middle" class="small">APPROVED_FOR_EXECUTION</text>
+
+  <rect x="1210" y="196" width="96" height="106" rx="10" fill="#251807" stroke="#fbbf24" stroke-width="3" filter="url(#shadow)"/>
+  <rect x="1232" y="237" width="54" height="43" rx="6" fill="#fbbf24"/>
+  <path d="M1242 237 V221 C1242 203 1276 203 1276 221 V237" stroke="#fbbf24" stroke-width="9" fill="none"/>
+  <circle cx="1259" cy="257" r="7" fill="#111827"/><rect x="1256" y="257" width="6" height="16" fill="#111827"/>
+  <text x="1258" y="332" text-anchor="middle" class="body">Execution Guard</text>
+  <text x="1258" y="353" text-anchor="middle" class="body">Re-checks Boundary</text>
+  <text x="1258" y="374" text-anchor="middle" class="body">and Protects Resources</text>
+  <rect x="1184" y="402" width="150" height="110" rx="9" fill="#1f1607" stroke="#fbbf24" stroke-width="2"/>
+  <text x="1259" y="429" text-anchor="middle" class="body">STATUS:</text>
+  <text x="1259" y="460" text-anchor="middle" class="yellowText" font-size="22" font-family="Arial">RELEASED</text>
+  <text x="1259" y="482" text-anchor="middle" class="small yellowText">PROTECTED EFFECT</text>
+  <text x="1259" y="501" text-anchor="middle" class="small yellowText">AUTHORIZED</text>
+
+  <path d="M1360 185 L1550 185 L1550 625 C1530 615 1515 635 1494 625 C1473 615 1458 635 1437 625 C1416 615 1401 635 1380 625 C1368 619 1360 623 1360 623 Z" fill="#f8fafc" stroke="#e5e7eb" stroke-width="2" filter="url(#shadow)"/>
+  <text x="1376" y="216" fill="#0b3b80" font-size="16" font-family="Arial" font-weight="800">MISSION CONTROL RECEIPT</text>
+  <text x="1376" y="254" fill="#111827" font-size="13" font-family="Arial" font-weight="700">Receipt ID:</text><text x="1376" y="272" fill="#111827" font-size="13" font-family="Arial">receipt-REQ-PROD-001</text>
+  <text x="1376" y="306" fill="#111827" font-size="13" font-family="Arial" font-weight="700">Request ID:</text><text x="1376" y="324" fill="#111827" font-size="13" font-family="Arial">INC-1042</text>
+  <text x="1376" y="358" fill="#111827" font-size="13" font-family="Arial" font-weight="700">Decision:</text><text x="1376" y="376" fill="#111827" font-size="13" font-family="Arial">ESCALATE</text>
+  <text x="1376" y="410" fill="#111827" font-size="13" font-family="Arial" font-weight="700">Protected Effect Status:</text><text x="1376" y="428" fill="#111827" font-size="13" font-family="Arial">PENDING_HIGH_AUTHORITY_REVIEW</text>
+  <text x="1376" y="462" fill="#111827" font-size="13" font-family="Arial" font-weight="700">Replay Token:</text><text x="1376" y="480" fill="#111827" font-size="13" font-family="Arial">replay-prod-001</text>
+  <text x="1376" y="514" fill="#111827" font-size="13" font-family="Arial" font-weight="700">Timestamp:</text><text x="1376" y="532" fill="#111827" font-size="13" font-family="Arial">2026-05-23T13:20:50Z</text>
+  <circle cx="1530" cy="252" r="19" fill="#1f7a34"/><path d="M1520 250 l8 8 l17 -22" stroke="#f8fafc" stroke-width="5" fill="none" stroke-linecap="round"/>
+  <circle cx="1388" cy="580" r="13" fill="#d1fae5"/><path d="M1381 579 l6 6 l14 -17" stroke="#16a34a" stroke-width="4" fill="none"/>
+  <text x="1410" y="578" fill="#166534" font-size="13" font-family="Arial">Deterministic replay</text>
+  <text x="1410" y="596" fill="#166534" font-size="13" font-family="Arial">verification available</text>
+
+  <rect class="thinPanel" x="555" y="530" width="610" height="165" rx="10"/>
+  <text x="860" y="555" text-anchor="middle" class="label">8. REPLAY VERIFICATION (DETERMINISTIC)</text>
+  <rect x="570" y="568" width="275" height="110" rx="8" fill="#06182b" stroke="#124f83"/>
+  <text x="645" y="594" class="blueText" font-size="14" font-family="Arial">SAME-CONDITION REPLAY</text>
+  <text x="645" y="624" class="small">Re-execute with identical inputs</text>
+  <text x="645" y="654" class="small">Result: </text><text x="696" y="654" class="yellowText" font-size="14" font-family="Arial">ESCALATE</text>
+  <path d="M604 607 a24 24 0 1 1 -2 39" stroke="#bde7ff" stroke-width="6" fill="none"/><polygon points="590,646 612,647 602,667" fill="#bde7ff"/>
+  <rect x="848" y="568" width="300" height="110" rx="8" fill="#06182b" stroke="#124f83"/>
+  <text x="932" y="594" class="yellowText" font-size="14" font-family="Arial">CHANGED-CONDITION REPLAY</text>
+  <text x="932" y="624" class="small">Re-execute with modified conditions</text>
+  <text x="932" y="654" class="small">Result: </text><text x="984" y="654" class="redText" font-size="14" font-family="Arial">REFUSE</text>
+  <path d="M890 607 a24 24 0 1 0 2 39" stroke="#f8fafc" stroke-width="6" fill="none"/><polygon points="904,646 882,647 892,667" fill="#f8fafc"/>
+  <polygon points="908,620 925,650 891,650" fill="#ef4444"/><text x="908" y="643" text-anchor="middle" fill="#fff" font-size="20" font-family="Arial" font-weight="800">!</text>
+
+  <rect class="panel" x="20" y="710" width="380" height="295" rx="10"/>
+  <text x="50" y="742" class="label">KEY SYSTEM PROPERTIES</text>
+  <circle cx="70" cy="785" r="18" fill="#0b3158" stroke="#7dd3fc"/><text x="102" y="790" class="blueText" font-size="17" font-family="Arial">Immutable Audit Trail</text><text x="102" y="812" class="small">Every action is recorded and traceable.</text>
+  <circle cx="70" cy="842" r="18" fill="#0b3158" stroke="#7dd3fc"/><text x="102" y="847" class="blueText" font-size="17" font-family="Arial">Deterministic Replay</text><text x="102" y="869" class="small">Any decision can be reproduced and verified.</text>
+  <circle cx="70" cy="899" r="18" fill="#0b3158" stroke="#7dd3fc"/><text x="102" y="904" class="blueText" font-size="17" font-family="Arial">Fail-Closed by Default</text><text x="102" y="926" class="small">Unmet conditions result in refusal, never guesswork.</text>
+  <circle cx="70" cy="956" r="18" fill="#0b3158" stroke="#7dd3fc"/><text x="102" y="961" class="blueText" font-size="17" font-family="Arial">Evidence-Driven Decisions</text><text x="102" y="983" class="small">All decisions are grounded in evidence and policy.</text>
+
+  <rect class="panel" x="415" y="710" width="485" height="295" rx="10"/>
+  <text x="525" y="742" class="label">AUDIT TRAIL (RECENT EVENTS)</text>
+  <rect x="430" y="755" width="455" height="220" rx="8" fill="#06182b"/>
+  <text x="440" y="780" class="small">Time (UTC)</text><text x="590" y="780" class="small">Event</text><text x="720" y="780" class="small">Actor</text><text x="820" y="780" class="small">Outcome</text>
+  <g class="small">
+    <text x="440" y="808">13:18:05</text><text x="590" y="808">Request Created</text><text x="720" y="808">operator_jane</text><text x="820" y="808">—</text>
+    <text x="440" y="838">13:18:21</text><text x="590" y="838">Policy Evaluation</text><text x="720" y="838">policy_engine</text><text x="820" y="838" class="yellowText">ESCALATE</text>
+    <text x="440" y="868">13:19:02</text><text x="590" y="868">Escalated</text><text x="720" y="868">system</text><text x="820" y="868" class="redText">PENDING</text>
+    <text x="440" y="898">13:19:45</text><text x="590" y="898">Review Approved</text><text x="720" y="898">reviewer_sam</text><text x="820" y="898" class="purpleText">APPROVE</text>
+    <text x="440" y="928">13:20:15</text><text x="590" y="928">Execution Released</text><text x="720" y="928">execution_guard</text><text x="820" y="928" class="yellowText">RELEASED</text>
+    <text x="440" y="958">13:20:50</text><text x="590" y="958">Receipt Issued</text><text x="720" y="958">system</text><text x="820" y="958" class="blueText">RECEIPT</text>
   </g>
 
-  <g transform="translate(435,235)">
-    <rect class="guard" x="0" y="0" width="185" height="118"/>
-    <text class="label" x="24" y="42">Runtime Gate</text>
-    <text class="small" x="24" y="72">authority / scope</text>
-    <text class="small" x="24" y="94">evidence / risk</text>
-  </g>
+  <rect class="panel" x="915" y="710" width="665" height="295" rx="10"/>
+  <text x="1120" y="742" class="label">MISSION CONTROL DASHBOARD (RUNTIME STATUS)</text>
+  <rect x="935" y="755" width="140" height="92" rx="6" fill="#06182b" stroke="#124f83"/><text x="958" y="782" class="small">TOTAL REQUESTS</text><text x="968" y="820" fill="#fff" font-size="28" font-family="Arial" font-weight="800">1,248</text><text x="955" y="842" class="greenText" font-size="12">↑ 12% vs yesterday</text>
+  <rect x="1082" y="755" width="155" height="92" rx="6" fill="#06182b" stroke="#124f83"/><text x="1112" y="782" class="small">PENDING REVIEW</text><text x="1142" y="820" fill="#fff" font-size="28" font-family="Arial" font-weight="800">18</text><text x="1120" y="842" class="greenText" font-size="12">↓ 8% vs yesterday</text>
+  <rect x="1245" y="755" width="155" height="92" rx="6" fill="#06182b" stroke="#124f83"/><text x="1286" y="782" class="small">ESCALATED</text><text x="1310" y="820" class="yellowText" font-size="28" font-family="Arial">7</text><text x="1288" y="842" class="yellowText" font-size="12">↑ 3% vs yesterday</text>
+  <rect x="1408" y="755" width="155" height="92" rx="6" fill="#06182b" stroke="#124f83"/><text x="1435" y="782" class="small">EXECUTIONS TODAY</text><text x="1470" y="820" fill="#fff" font-size="28" font-family="Arial" font-weight="800">32</text><text x="1445" y="842" class="greenText" font-size="12">↑ 15% vs yesterday</text>
+  <rect x="935" y="858" width="315" height="120" rx="6" fill="#06182b" stroke="#124f83"/>
+  <text x="955" y="882" class="small">REQUESTS OVER TIME (7D)</text>
+  <polyline points="960,950 985,930 1010,920 1035,930 1060,918 1090,912 1112,895 1140,895 1165,880 1190,882 1215,870 1240,872" fill="none" stroke="#3b82f6" stroke-width="4"/>
+  <rect x="1260" y="858" width="300" height="120" rx="6" fill="#06182b" stroke="#124f83"/>
+  <text x="1280" y="882" class="small">DECISIONS (7D)</text>
+  <circle cx="1332" cy="925" r="42" fill="none" stroke="#22c55e" stroke-width="24" stroke-dasharray="170 90"/>
+  <circle cx="1332" cy="925" r="42" fill="none" stroke="#fbbf24" stroke-width="24" stroke-dasharray="45 215" stroke-dashoffset="-170"/>
+  <circle cx="1332" cy="925" r="42" fill="none" stroke="#ef4444" stroke-width="24" stroke-dasharray="25 235" stroke-dashoffset="-215"/>
+  <text x="1400" y="910" class="small">ADMIT 68%</text><text x="1400" y="935" class="small">ESCALATE 18%</text><text x="1400" y="960" class="small">REFUSE 7%</text>
 
-  <g transform="translate(650,235)">
-    <rect class="node" x="0" y="0" width="160" height="118"/>
-    <text class="label" x="24" y="42">Review</text>
-    <text class="small" x="24" y="72">approve / hold</text>
-    <text class="small" x="24" y="94">escalate / refuse</text>
-  </g>
-
-  <g transform="translate(840,235)">
-    <rect class="guard" x="0" y="0" width="180" height="118"/>
-    <text class="label" x="24" y="42">Execution</text>
-    <text class="small" x="24" y="72">guarded release</text>
-    <text class="small" x="24" y="94">blocked if unsafe</text>
-  </g>
-
-  <g transform="translate(1050,235)">
-    <rect class="node" x="0" y="0" width="150" height="118"/>
-    <text class="label" x="24" y="42">Receipt</text>
-    <text class="small" x="24" y="72">stable hash</text>
-    <text class="small" x="24" y="94">replay token</text>
-  </g>
-
-  <g transform="translate(1230,235)">
-    <rect class="node" x="0" y="0" width="120" height="118"/>
-    <text class="label" x="24" y="42">Audit</text>
-    <text class="small" x="24" y="72">trail</text>
-    <text class="small" x="24" y="94">evidence</text>
-  </g>
-
-  <path class="line" d="M215 294 H245"/><polygon class="arrow" points="245,294 232,286 232,302"/>
-  <path class="line" d="M405 294 H435"/><polygon class="arrow" points="435,294 422,286 422,302"/>
-  <path class="line" d="M620 294 H650"/><polygon class="arrow" points="650,294 637,286 637,302"/>
-  <path class="line" d="M810 294 H840"/><polygon class="arrow" points="840,294 827,286 827,302"/>
-  <path class="line" d="M1020 294 H1050"/><polygon class="arrow" points="1050,294 1037,286 1037,302"/>
-  <path class="line" d="M1200 294 H1230"/><polygon class="arrow" points="1230,294 1217,286 1217,302"/>
-
-  <g transform="translate(105,430)">
-    <rect x="0" y="0" width="1190" height="170" rx="28" fill="#0f172a" stroke="#334155" stroke-width="2"/>
-    <text x="34" y="48" class="label">Core outcomes</text>
-    <rect x="34" y="72" width="160" height="50" rx="25" class="pillBlue"/>
-    <text x="78" y="103" class="tiny">ADMIT</text>
-    <rect x="230" y="72" width="160" height="50" rx="25" fill="#facc15"/>
-    <text x="282" y="103" class="tiny">HOLD</text>
-    <rect x="426" y="72" width="160" height="50" rx="25" fill="#fb923c"/>
-    <text x="463" y="103" class="tiny">ESCALATE</text>
-    <rect x="622" y="72" width="160" height="50" rx="25" fill="#ef4444"/>
-    <text x="670" y="103" class="tiny">REFUSE</text>
-    <text x="832" y="88" class="small">Every material action is tenant-scoped, reviewed when required,</text>
-    <text x="832" y="112" class="small">receipt-backed, replayable, and auditable.</text>
-  </g>
-
-  <text x="70" y="666" class="small">Production posture: trusted ingress required · explicit tenant id required · unsafe production config rejected · no protected effect on REFUSE</text>
+  <rect x="100" y="1018" width="1350" height="22" rx="10" fill="#03101f" stroke="#12639e"/>
+  <text x="120" y="1035" fill="#38bdf8" font-size="17" font-family="Arial" font-weight="800">GOVERNED EXECUTION. PROTECTED EFFECTS. AUDITABLE BY DESIGN. REPLAYABLE ALWAYS.</text>
+  <text x="1360" y="1035" fill="#38bdf8" font-size="17" font-family="Arial" font-weight="800">v0.4.0</text>
 </svg>
