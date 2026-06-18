@@ -92,6 +92,7 @@ This repo includes an end-to-end runtime with:
 - schema versioning and Alembic migrations
 - GitHub Actions CI with SQLite and PostgreSQL backend coverage
 - CodeQL workflow
+- deployment certification repository gate
 - smoke test script
 - local demo walkthrough script
 - end-to-end API tests
@@ -343,6 +344,7 @@ Implemented controls include:
 - Runtime signing keys support current and verify-only previous values.
 - Monitoring profile exposes operational probes, counters, alerts, and incident handoff fields.
 - PostgreSQL migrations and backend tests run in CI.
+- Deployment certification gate separates repository readiness from production certification.
 
 Remaining production-readiness work includes:
 
@@ -368,6 +370,18 @@ Run it in strict mode when the remaining production-readiness package is expecte
 
 ```bash
 python scripts/check_deployment_readiness.py --strict
+```
+
+Run the deployment certification repository gate:
+
+```bash
+python scripts/certify_deployment.py --repo-check-only
+```
+
+Run the certification gate only with completed approval evidence:
+
+```bash
+python scripts/certify_deployment.py --certify --evidence-file <completed-evidence-file>
 ```
 
 ## Future extensions
@@ -397,6 +411,7 @@ python scripts/check_deployment_readiness.py --strict
 - `docs/monitoring-profile.md`
 - `docs/incident-response.md`
 - `docs/postgres-ci.md`
+- `docs/deployment-certification-gate.md`
 - `docs/local-demo-walkthrough.md`
 - `docs/deployment-evidence-template.md`
 - `docs/release-checklist.md`
@@ -410,5 +425,4 @@ python scripts/check_deployment_readiness.py --strict
 The remaining production-readiness work is tracked in GitHub issue #27 and includes:
 
 - distributed limiter or gateway enforcement for multi-instance deployments
-- deployment certification gate
 - customer-approved storage, retention, and backup policy

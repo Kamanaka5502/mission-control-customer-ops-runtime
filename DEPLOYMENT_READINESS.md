@@ -6,9 +6,9 @@ Mission Control is a production-candidate customer-operations runtime pattern. T
 
 Status: **repository-hardened, not production-certified**.
 
-The repository currently demonstrates an operational runtime with request intake, evaluation, review, controlled execution, receipt, replay, audit trail, dashboard, CI, CodeQL, migration path, production setting validation, trusted-ingress requirement, and tenant-header enforcement in production mode.
+The repository demonstrates an operational runtime with request intake, evaluation, review, controlled execution, receipt, replay, audit trail, dashboard, CI, CodeQL, migration path, PostgreSQL CI coverage, production setting validation, trusted-ingress requirement, tenant-header enforcement, monitoring profile, incident-response documentation, key-management validation, and a deployment certification gate.
 
-The repository still requires additional controls before customer deployment or production certification claims are appropriate.
+The repository still requires customer security approval, external audit approval, or equivalent written deployment authorization before production-certified claims are appropriate.
 
 ## Production-candidate architecture
 
@@ -32,6 +32,7 @@ Authenticated API Boundary
     +--> Receipt Signing
     +--> Replay Verification
     +--> Tamper-Evident Audit Ledger
+    +--> Monitoring Profile
     |
     v
 Persistent Proof Store / PostgreSQL
@@ -43,20 +44,32 @@ Persistent Proof Store / PostgreSQL
 - Runtime decision outcomes: `ADMIT`, `HOLD`, `ESCALATE`, `REFUSE`
 - Review action API
 - Controlled execution gate
+- Execution idempotency and final pre-execution checks
 - No protected effect on `REFUSE`
 - Persisted receipt endpoint
 - Persisted replay endpoints
+- Signed receipt verification
+- External receipt verifier
 - Audit trail endpoint
+- Tamper-evident audit ledger verification
+- Persistent proof bundle store
 - Metrics endpoint
+- Monitoring profile endpoint
+- Incident-response documentation
 - Dashboard API and frontend
 - Correlation IDs
 - Schema version endpoint
 - Alembic migration path
+- PostgreSQL CI coverage
 - Docker Compose profiles
 - Production setting validation
 - Production refusal for unsafe local database configuration
 - Production trusted-ingress requirement
 - Production tenant-header requirement
+- Authentication and RBAC
+- Tenant-scoped request access
+- API rate limits and body-size limits
+- Production key-management validation
 - Defensive response headers
 - Explicit CORS configuration for production mode
 - CI workflow
@@ -64,29 +77,21 @@ Persistent Proof Store / PostgreSQL
 - Dependabot configuration
 - Release checklist
 - Deployment evidence template
+- Deployment certification gate
 - Security policy
 - Contribution guide
 
-## Candidate controls still required
+## Certification controls still external
 
-The following controls are required before all-A production-candidate claims are complete:
+The following items are intentionally outside repository-only proof and require deployment-specific evidence:
 
-- real authentication
-- RBAC enforcement
-- complete tenant-scoped authorization across every object
-- immutable request snapshots
-- evidence manifest integrity
-- signed receipts
-- external receipt verifier
-- tamper-evident audit ledger
-- persistent proof bundle store
-- PostgreSQL CI and production profile
-- API rate limiting and body limits
-- execution idempotency and final pre-execution checks
-- production key management and key rotation
-- monitoring and incident-response procedures
-- deployment readiness checker
-- threat model completion and test mapping
+- customer security approval, external audit approval, or equivalent written deployment authorization
+- customer-approved storage, retention, backup, and restore policy
+- customer-approved logging and alert routing
+- customer-approved secrets/KMS/HSM policy
+- customer-approved ingress and identity-provider configuration
+- deployment-specific rollback approval
+- production load, latency, and availability validation
 
 ## Required environment variables
 
@@ -96,9 +101,11 @@ The production deployment must explicitly define at least:
 - `DATABASE_URL` using a managed PostgreSQL database
 - `REQUIRE_TENANT_HEADER=true`
 - `REQUIRE_TRUSTED_INGRESS=true`
+- `AUTH_REQUIRED=true`
+- `AUTH_TOKEN_SECRET` from a secret manager or deployment environment
+- `RECEIPT_SIGNING_KEY_ID` with an explicit non-default key id
+- `RECEIPT_SIGNING_SECRET` from a secret manager or deployment environment
 - `CORS_ALLOW_ORIGINS` with approved origins only
-- signing-key configuration once receipt signing is implemented
-- auth-provider or token configuration once authentication is implemented
 
 ## Database requirements
 
@@ -116,7 +123,7 @@ SQLite is permitted for local development only.
 
 ## Auth and RBAC requirements
 
-Before customer deployment, the runtime must require authentication for all protected mutation and export paths.
+Production mode requires authentication for protected runtime actions.
 
 Required role families:
 
@@ -128,17 +135,17 @@ Required role families:
 - service account
 - tenant admin
 
-Each role must have explicit endpoint permissions and tests proving that unauthorized roles fail closed.
+Each role has explicit endpoint permissions and tests proving that unauthorized roles fail closed.
 
 ## Tenant isolation requirements
 
-Every runtime object that can affect customer state must carry a tenant identifier and enforce tenant-scoped access.
+Runtime objects that can affect customer state carry a tenant identifier and enforce tenant-scoped access.
 
 Tenant A must not read, replay, export, or execute Tenant B objects.
 
 ## Receipt and audit requirements
 
-Before stronger proof-chain claims are made, Mission Control must implement:
+Mission Control implements:
 
 - immutable request snapshot digest
 - evidence manifest digest
@@ -148,20 +155,21 @@ Before stronger proof-chain claims are made, Mission Control must implement:
 - external receipt verifier
 - append-only audit hash chain
 - audit ledger verifier
+- persistent signed proof bundle verifier
 
 ## Monitoring requirements
 
-Production candidate monitoring must include alerts or equivalent operational signals for:
+Production candidate monitoring includes repository-level operational signals for:
 
-- failed receipt verification
-- failed replay verification
-- failed audit ledger verification
-- repeated refusal or escalation spikes
-- cross-tenant access attempts
-- bypass attempts
-- execution failures
-- receipt signing failures
-- key rotation events
+- database availability
+- schema version state
+- request lifecycle counts
+- decision outcome counts
+- pending review visibility
+- refusal visibility
+- incident handoff fields
+
+Customer deployment should connect these outputs to customer-approved monitoring, logging, alert routing, and incident-management tooling.
 
 ## Rollback requirements
 
@@ -182,22 +190,28 @@ Go requires:
 - all required configuration set explicitly
 - migrations applied successfully
 - readiness endpoint healthy
+- monitoring endpoint available
 - CI and CodeQL green
+- SQLite backend tests passing
+- PostgreSQL backend tests passing
 - protected-route tests passing
 - tenant isolation tests passing
-- receipt/replay/audit tests passing
+- receipt/replay/audit/proof tests passing
 - rollback path documented
 - deployment evidence recorded
+- certification evidence approved for the exact deployment scope
 
 No-go if:
 
 - auth is disabled in production
-- default or missing signing keys are present after receipt signing is implemented
+- default or missing signing keys are present
 - tenant enforcement is disabled
+- trusted ingress enforcement is disabled
 - unsafe local database is used in production
-- audit or receipt verification fails
+- audit, receipt, proof, or replay verification fails
 - required environment variables are missing
 - customer security approval or external audit is required but not complete
+- deployment certification evidence is missing or not approved
 
 ## External audit checklist
 
@@ -213,16 +227,28 @@ External review should inspect:
 - production database posture
 - API hardening
 - key management
+- monitoring and incident response
 - deployment process
-- incident response process
 - claims boundary
 
 ## Production certification gate
 
-Mission Control must not be described as production certified until one of the following is complete:
+Mission Control must not be described as production certified until one of the following is complete for the specific deployment scope:
 
-1. customer security approval for the specific deployment scope, or
+1. customer security approval, or
 2. external audit covering the implemented controls, or
 3. equivalent written deployment authorization.
+
+Use the repository gate for code-level readiness:
+
+```bash
+python scripts/certify_deployment.py --repo-check-only
+```
+
+Use the certification gate only with completed deployment evidence:
+
+```bash
+python scripts/certify_deployment.py --certify --evidence-file <completed-evidence-file>
+```
 
 Until that gate is complete, use: **production-candidate operational runtime**.

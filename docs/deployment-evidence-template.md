@@ -1,6 +1,6 @@
 # Deployment Evidence Template
 
-Use this template to record external deployment evidence. This document is intentionally separate from source code because A++ posture requires operational proof from the real environment.
+Use this template to record external deployment evidence. This document is intentionally separate from source code because production certification requires operational proof from the real environment.
 
 ## Deployment summary
 
@@ -10,6 +10,23 @@ Use this template to record external deployment evidence. This document is inten
 - operator:
 - API base URL:
 - frontend URL:
+
+## Certification gate fields
+
+These fields are machine-checkable by `scripts/certify_deployment.py`.
+
+```text
+certification_status: HOLD
+approved_scope:
+approved_commit:
+approver:
+approval_date:
+customer_security_approval: false
+external_audit_approval: false
+written_deployment_authorization: false
+```
+
+Set `certification_status: APPROVED` only when the deployment scope has customer security approval, external audit approval, or equivalent written deployment authorization.
 
 ## External controls
 
@@ -30,7 +47,9 @@ Record evidence that production mode is using required controls:
 APP_ENV=production
 REQUIRE_TENANT_HEADER=true
 REQUIRE_TRUSTED_INGRESS=true
+AUTH_REQUIRED=true
 CORS_ALLOW_ORIGINS=<explicit deployed origin>
+RECEIPT_SIGNING_KEY_ID=<explicit key id>
 ```
 
 ## Validation commands
@@ -39,6 +58,7 @@ CORS_ALLOW_ORIGINS=<explicit deployed origin>
 curl <api-base-url>/health
 curl <api-base-url>/ready
 curl <api-base-url>/schema-version
+curl <api-base-url>/ops/monitoring
 ```
 
 ## Boundary smoke tests
@@ -48,6 +68,9 @@ curl <api-base-url>/schema-version
 - [ ] request with tenant mismatch is denied
 - [ ] invalid actor role is denied
 - [ ] REFUSE outcome cannot release protected action
+- [ ] receipt verification succeeds
+- [ ] proof bundle verification succeeds
+- [ ] audit ledger verification succeeds
 - [ ] correlation id appears in logs
 
 ## Rollback evidence
