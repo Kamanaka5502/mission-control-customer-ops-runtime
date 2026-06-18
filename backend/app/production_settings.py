@@ -1,9 +1,10 @@
 import os
 from dataclasses import dataclass
+from urllib.parse import urlparse
 
 
 TRUE_VALUES = {"1", "true", "yes", "on"}
-LOCAL_ORIGINS = {"http://localhost:3000", "http://127.0.0.1:3000"}
+LOCAL_CORS_HOSTS = {"localhost", "127.0.0.1", "0.0.0.0", "::1"}
 
 
 @dataclass(frozen=True)
@@ -27,6 +28,12 @@ def configured_cors_origins() -> list[str]:
     return [origin.strip() for origin in raw.split(",") if origin.strip()]
 
 
+def is_local_cors_origin(origin: str) -> bool:
+    parsed = urlparse(origin.strip())
+    host = (parsed.hostname or "").lower()
+    return host in LOCAL_CORS_HOSTS
+
+
 def validate_production_settings() -> None:
     if not production_mode():
         return
@@ -48,7 +55,7 @@ def validate_production_settings() -> None:
 
     if not cors_origins:
         issues.append("CORS_ALLOW_ORIGINS must be explicit")
-    elif any(origin in LOCAL_ORIGINS for origin in cors_origins):
+    elif any(is_local_cors_origin(origin) for origin in cors_origins):
         issues.append("localhost CORS origins are not allowed when APP_ENV=production")
 
     if issues:
