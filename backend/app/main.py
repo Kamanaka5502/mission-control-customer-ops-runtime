@@ -25,8 +25,8 @@ validate_production_settings()
 
 app = FastAPI(
     title="Mission Control: Customer Operations Runtime",
-    version="0.6.0",
-    description="Customer operations runtime with intake, persistence, review gates, controlled execution, receipts, replay, audit, metrics, dashboard APIs, and production-boundary controls."
+    version="0.7.0",
+    description="Customer operations runtime with intake, persistence, review gates, controlled execution, receipts, replay, audit, metrics, dashboard APIs, production-boundary controls, authentication, and RBAC."
 )
 
 app.add_middleware(SecurityHeadersMiddleware)
@@ -36,7 +36,7 @@ app.add_middleware(
     allow_origins=cors_origins(),
     allow_credentials=True,
     allow_methods=["GET", "POST", "OPTIONS"],
-    allow_headers=["authorization", "content-type", "x-actor-role", "x-tenant-id", "x-ingress-verified", "x-correlation-id"],
+    allow_headers=["authorization", "content-type", "x-actor-role", "x-actor-id", "x-actor-scopes", "x-tenant-id", "x-ingress-verified", "x-correlation-id"],
 )
 
 
