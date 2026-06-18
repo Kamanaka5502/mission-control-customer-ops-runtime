@@ -1,5 +1,6 @@
+import hashlib
+import hmac
 import json
-import os
 import re
 from datetime import datetime, timezone
 from pathlib import Path
@@ -8,10 +9,10 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from app.db_models import AuditEvent, Decision, EvidenceItem, OperationRequest
-from app.services.audit import audit_head_anchor, verify_audit_ledger
+from app.services.audit import AUDIT_GENESIS_HASH, audit_head_anchor, compute_audit_event_hash, verify_audit_ledger
 from app.services.integrity import build_evidence_manifest, build_request_snapshot, stable_hash
 from app.services.policy_gate import evaluate_request
-from app.services.receipt import build_receipt, verify_receipt_signature
+from app.services.receipt import SIGNATURE_ALGORITHM, build_receipt, receipt_key_id, sign_public_hash, verify_receipt_signature
 
 
 PROOF_BUNDLE_VERSION = "proof-bundle-v1"
@@ -20,7 +21,7 @@ SAFE_REQUEST_ID_PATTERN = re.compile(r"^[A-Za-z0-9_.:-]+$")
 
 
 def proof_store_dir() -> Path:
-    return Path(os.getenv("PROOF_STORE_PATH", DEFAULT_PROOF_STORE_DIR)).resolve()
+    return Path(DEFAULT_PROOF_STORE_DIR).resolve()
 
 
 def safe_request_id(request_id: str) -> str:
@@ -29,10 +30,15 @@ def safe_request_id(request_id: str) -> str:
     return request_id
 
 
-def proof_bundle_path(request_id: str, *, base_dir: Path | None = None) -> Path:
+def proof_bundle_filename(request_id: str) -> str:
     safe_id = safe_request_id(request_id)
+    digest = hashlib.sha256(safe_id.encode("utf-8")).hexdigest()
+    return f"{digest}.proof.json"
+
+
+def proof_bundle_path(request_id: str, *, base_dir: Path | None = None) -> Path:
     root = (base_dir or proof_store_dir()).resolve()
-    path = (root / f"{safe_id}.proof.json").resolve()
+    path = (root / proof_bundle_filename(request_id)).resolve()
     if root != path and root not in path.parents:
         raise ValueError("proof bundle path escapes proof-store directory")
     return path
@@ -66,6 +72,35 @@ def _latest_event(events: list[AuditEvent], event_type: str) -> AuditEvent | Non
     return matching[-1] if matching else None
 
 
+def _audit_event_payload(event: AuditEvent) -> dict[str, Any]:
+    return {
+        "id": event.id,
+        "request_id": event.request_id,
+        "event_type": event.event_type,
+        "actor": event.actor,
+        "detail": event.detail or {},
+        "created_at": event.created_at.replace(microsecond=0).isoformat() if event.created_at else None,
+    }
+
+
+def _compute_proof_hash(proof_body: dict[str, Any]) -> str:
+    return stable_hash(proof_body)
+
+
+def _sign_proof_hash(proof_hash: str) -> str:
+    return sign_public_hash(proof_hash)
+
+
+def _proof_hash_body(bundle: dict[str, Any]) -> dict[str, Any]:
+    body = dict(bundle)
+    body.pop("proof_hash", None)
+    body.pop("proof_hash_algorithm", None)
+    body.pop("proof_signature_algorithm", None)
+    body.pop("proof_signature_key_id", None)
+    body.pop("proof_signature", None)
+    return body
+
+
 def build_proof_bundle(db: Session, request_id: str) -> dict[str, Any]:
     operation = db.get(OperationRequest, request_id)
     if not operation:
@@ -86,16 +121,14 @@ def build_proof_bundle(db: Session, request_id: str) -> dict[str, Any]:
     captured_manifest_hash = (captured_manifest_event.detail or {}).get("manifest_hash") if captured_manifest_event else None
 
     req_model = _operation_to_customer_request(operation)
-    receipt = build_receipt(
+    original_receipt = build_receipt(
         req_model,
         decision.outcome,
         decision.protected_effect_status,
         decision.no_bind_status,
         decision.reason_codes,
-        request_snapshot_hash=request_snapshot["snapshot_hash"],
-        evidence_manifest_hash=evidence_manifest["manifest_hash"],
     )
-    receipt_payload = receipt.model_dump(mode="json")
+    receipt_payload = original_receipt.model_dump(mode="json")
 
     replay_outcome, replay_status, replay_no_bind, replay_reason_codes = evaluate_request(req_model)
     replay_result = {
@@ -134,6 +167,8 @@ def build_proof_bundle(db: Session, request_id: str) -> dict[str, Any]:
         "receipt": receipt_payload,
         "receipt_verification": verify_receipt_signature(receipt_payload),
         "replay_result": replay_result,
+        "audit_anchor": anchor,
+        "audit_events": [_audit_event_payload(event) for event in audit_events],
         "audit_ledger": audit_ledger,
         "integrity": {
             "request_snapshot_match": captured_snapshot_hash == request_snapshot["snapshot_hash"],
@@ -144,11 +179,14 @@ def build_proof_bundle(db: Session, request_id: str) -> dict[str, Any]:
             "current_evidence_manifest_hash": evidence_manifest["manifest_hash"],
         },
     }
-    proof_hash = stable_hash(proof_body)
+    proof_hash = _compute_proof_hash(proof_body)
     return {
         **proof_body,
         "proof_hash_algorithm": "sha256",
         "proof_hash": proof_hash,
+        "proof_signature_algorithm": SIGNATURE_ALGORITHM,
+        "proof_signature_key_id": receipt_key_id(),
+        "proof_signature": _sign_proof_hash(proof_hash),
     }
 
 
@@ -169,24 +207,91 @@ def load_proof_bundle(request_id: str, *, base_dir: Path | None = None) -> dict[
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def _verify_snapshot_hash(bundle: dict[str, Any]) -> bool:
+    snapshot_container = bundle.get("request_snapshot") or {}
+    snapshot = snapshot_container.get("snapshot") or {}
+    return snapshot_container.get("snapshot_hash") == stable_hash(snapshot)
+
+
+def _verify_manifest_hash(bundle: dict[str, Any]) -> bool:
+    manifest_container = bundle.get("evidence_manifest") or {}
+    manifest = manifest_container.get("manifest") or {}
+    return manifest_container.get("manifest_hash") == stable_hash(manifest)
+
+
+def _verify_audit_events(bundle: dict[str, Any]) -> dict[str, Any]:
+    previous_hash = AUDIT_GENESIS_HASH
+    failures: list[dict[str, Any]] = []
+    events = bundle.get("audit_events") or []
+    for index, event in enumerate(events):
+        detail = event.get("detail") or {}
+        ledger = detail.get("audit_ledger") or {}
+        stored_previous = ledger.get("previous_hash")
+        stored_hash = ledger.get("event_hash")
+        expected_hash = compute_audit_event_hash(
+            event_id=str(event.get("id") or ""),
+            request_id=str(event.get("request_id") or ""),
+            event_type=str(event.get("event_type") or ""),
+            actor=str(event.get("actor") or ""),
+            detail=detail,
+            previous_hash=previous_hash,
+        )
+        if stored_previous != previous_hash or stored_hash != expected_hash:
+            failures.append(
+                {
+                    "index": index,
+                    "event_id": event.get("id"),
+                    "expected_previous_hash": previous_hash,
+                    "stored_previous_hash": stored_previous,
+                    "expected_event_hash": expected_hash,
+                    "stored_event_hash": stored_hash,
+                }
+            )
+        previous_hash = str(stored_hash or expected_hash)
+
+    anchor = bundle.get("audit_anchor") or {}
+    expected_count = anchor.get("event_count")
+    expected_head = anchor.get("head_hash")
+    if expected_count is not None and expected_count != len(events):
+        failures.append({"reason": "event_count_mismatch", "expected_event_count": expected_count, "observed_event_count": len(events)})
+    if expected_head is not None and expected_head != previous_hash:
+        failures.append({"reason": "head_hash_mismatch", "expected_head_hash": expected_head, "observed_head_hash": previous_hash})
+
+    return {
+        "valid": not failures,
+        "event_count": len(events),
+        "head_hash": previous_hash,
+        "expected_event_count": expected_count,
+        "expected_head_hash": expected_head,
+        "failures": failures,
+    }
+
+
 def verify_proof_bundle(bundle: dict[str, Any]) -> dict[str, Any]:
     provided_hash = bundle.get("proof_hash")
-    body = dict(bundle)
-    body.pop("proof_hash", None)
-    body.pop("proof_hash_algorithm", None)
-    expected_hash = stable_hash(body)
+    body = _proof_hash_body(bundle)
+    expected_hash = _compute_proof_hash(body)
+    provided_signature = str(bundle.get("proof_signature") or "")
+    expected_signature = _sign_proof_hash(expected_hash)
 
     receipt_result = verify_receipt_signature(bundle.get("receipt") or {})
-    audit_result = bundle.get("audit_ledger") or {}
+    audit_result = _verify_audit_events(bundle)
     integrity = bundle.get("integrity") or {}
     replay = bundle.get("replay_result") or {}
+    decision = bundle.get("decision") or {}
+    receipt = bundle.get("receipt") or {}
 
     checks = {
         "proof_hash_matches": provided_hash == expected_hash,
+        "proof_signature_valid": hmac.compare_digest(provided_signature, expected_signature),
         "receipt_valid": bool(receipt_result.get("valid")),
+        "receipt_preserves_decision_token": decision.get("replay_token") == receipt.get("replay_token"),
+        "receipt_preserves_decision_id": decision.get("receipt_id") == receipt.get("receipt_id"),
+        "request_snapshot_hash_valid": _verify_snapshot_hash(bundle),
+        "evidence_manifest_hash_valid": _verify_manifest_hash(bundle),
         "audit_ledger_valid": bool(audit_result.get("valid")),
-        "request_snapshot_match": bool(integrity.get("request_snapshot_match")),
-        "evidence_manifest_match": bool(integrity.get("evidence_manifest_match")),
+        "request_snapshot_match": bool(integrity.get("request_snapshot_match")) and integrity.get("current_request_snapshot_hash") == (bundle.get("request_snapshot") or {}).get("snapshot_hash"),
+        "evidence_manifest_match": bool(integrity.get("evidence_manifest_match")) and integrity.get("current_evidence_manifest_hash") == (bundle.get("evidence_manifest") or {}).get("manifest_hash"),
         "same_condition_replay_matched": bool(replay.get("matched")),
     }
     return {
@@ -194,5 +299,8 @@ def verify_proof_bundle(bundle: dict[str, Any]) -> dict[str, Any]:
         "checks": checks,
         "expected_proof_hash": expected_hash,
         "provided_proof_hash": provided_hash,
+        "proof_signature_algorithm": bundle.get("proof_signature_algorithm"),
+        "proof_signature_key_id": bundle.get("proof_signature_key_id"),
         "receipt_verification": receipt_result,
+        "audit_verification": audit_result,
     }
