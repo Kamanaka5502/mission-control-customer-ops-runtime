@@ -29,6 +29,18 @@ def demo_request() -> CustomerRequest:
     )
 
 
+def base_production_env(monkeypatch):
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setenv("DATABASE_URL", "postgresql+psycopg://db.example/app")
+    monkeypatch.setenv("REQUIRE_TENANT_HEADER", "true")
+    monkeypatch.setenv("REQUIRE_TRUSTED_INGRESS", "true")
+    monkeypatch.setenv("AUTH_REQUIRED", "true")
+    monkeypatch.setenv("AUTH_TOKEN_SECRET", AUTH_NOW)
+    monkeypatch.setenv("RECEIPT_SIGNING_KEY_ID", "receipt-key-current")
+    monkeypatch.setenv("RECEIPT_SIGNING_SECRET", RECEIPT_NOW)
+    monkeypatch.setenv("CORS_ALLOW_ORIGINS", "https://app.example.com")
+
+
 def test_auth_token_verifies_with_previous_material(monkeypatch):
     token = create_auth_token(actor_id="old-service", role=Role.AUDITOR, secret=AUTH_OLD)
     monkeypatch.setenv("AUTH_TOKEN_SECRET", AUTH_NOW)
@@ -56,6 +68,22 @@ def test_receipt_verifies_with_previous_key(monkeypatch):
     assert result["signature_key_id"] == "receipt-key-old"
 
 
+def test_previous_receipt_key_can_reuse_current_secret(monkeypatch):
+    monkeypatch.setenv("RECEIPT_SIGNING_KEY_ID", "development-receipt-key")
+    monkeypatch.setenv("RECEIPT_SIGNING_SECRET", RECEIPT_NOW)
+    receipt = build_receipt(demo_request(), Outcome.ADMIT, "AUTHORIZED_TO_RELEASE", False, ["AUTHORITY_PRESENT"])
+    payload = receipt.model_dump(mode="json")
+
+    monkeypatch.setenv("RECEIPT_SIGNING_KEY_ID", "receipt-key-current")
+    monkeypatch.setenv("RECEIPT_SIGNING_SECRET", RECEIPT_NOW)
+    monkeypatch.setenv("RECEIPT_SIGNING_PREVIOUS_KEYS", f"development-receipt-key:{RECEIPT_NOW}")
+
+    result = verify_receipt_signature(payload)
+
+    assert result["valid"] is True
+    assert result["signature_key_id"] == "development-receipt-key"
+
+
 def test_receipt_requires_known_key(monkeypatch):
     monkeypatch.setenv("RECEIPT_SIGNING_KEY_ID", "receipt-key-old")
     monkeypatch.setenv("RECEIPT_SIGNING_SECRET", RECEIPT_OLD)
@@ -73,17 +101,30 @@ def test_receipt_requires_known_key(monkeypatch):
 
 
 def test_production_settings_requires_explicit_receipt_key(monkeypatch):
-    monkeypatch.setenv("APP_ENV", "production")
-    monkeypatch.setenv("DATABASE_URL", "postgresql+psycopg://db.example/app")
-    monkeypatch.setenv("REQUIRE_TENANT_HEADER", "true")
-    monkeypatch.setenv("REQUIRE_TRUSTED_INGRESS", "true")
-    monkeypatch.setenv("AUTH_REQUIRED", "true")
-    monkeypatch.setenv("AUTH_TOKEN_SECRET", AUTH_NOW)
+    base_production_env(monkeypatch)
     monkeypatch.setenv("RECEIPT_SIGNING_KEY_ID", "development-receipt-key")
-    monkeypatch.setenv("RECEIPT_SIGNING_SECRET", RECEIPT_NOW)
-    monkeypatch.setenv("CORS_ALLOW_ORIGINS", "https://app.example.com")
 
     with pytest.raises(ProductionSettingsError) as exc:
         validate_production_settings()
 
     assert "RECEIPT_SIGNING_KEY_ID" in str(exc.value)
+
+
+def test_production_settings_rejects_empty_previous_receipt_key_secret(monkeypatch):
+    base_production_env(monkeypatch)
+    monkeypatch.setenv("RECEIPT_SIGNING_PREVIOUS_KEYS", "old-key:")
+
+    with pytest.raises(ProductionSettingsError) as exc:
+        validate_production_settings()
+
+    assert "RECEIPT_SIGNING_PREVIOUS_KEYS" in str(exc.value)
+
+
+def test_production_settings_rejects_empty_previous_receipt_key_id(monkeypatch):
+    base_production_env(monkeypatch)
+    monkeypatch.setenv("RECEIPT_SIGNING_PREVIOUS_KEYS", f":{RECEIPT_OLD}")
+
+    with pytest.raises(ProductionSettingsError) as exc:
+        validate_production_settings()
+
+    assert "RECEIPT_SIGNING_PREVIOUS_KEYS" in str(exc.value)
