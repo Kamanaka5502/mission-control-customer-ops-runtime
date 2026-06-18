@@ -10,6 +10,7 @@ def set_base_production_env(monkeypatch):
     monkeypatch.setenv("REQUIRE_TRUSTED_INGRESS", "true")
     monkeypatch.setenv("AUTH_REQUIRED", "true")
     monkeypatch.setenv("AUTH_TOKEN_SECRET", "0123456789abcdef0123456789abcdef")
+    monkeypatch.setenv("RECEIPT_SIGNING_SECRET", "receipt-signing-secret-0123456789abcdef")
     monkeypatch.setenv("CORS_ALLOW_ORIGINS", "https://app.example.com")
 
 
@@ -69,6 +70,24 @@ def test_production_startup_refuses_default_or_sample_secret(monkeypatch, secret
         validate_production_settings()
 
     assert "AUTH_TOKEN_SECRET" in str(exc.value)
+
+
+@pytest.mark.parametrize(
+    "secret",
+    [
+        "development-receipt-secret-not-for-production",
+        "short-secret",
+        "",
+    ],
+)
+def test_production_startup_refuses_default_receipt_signing_secret(monkeypatch, secret):
+    set_base_production_env(monkeypatch)
+    monkeypatch.setenv("RECEIPT_SIGNING_SECRET", secret)
+
+    with pytest.raises(ProductionSettingsError) as exc:
+        validate_production_settings()
+
+    assert "RECEIPT_SIGNING_SECRET" in str(exc.value)
 
 
 def test_production_settings_require_auth(monkeypatch):

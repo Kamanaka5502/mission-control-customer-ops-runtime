@@ -41,10 +41,16 @@ class Receipt(BaseModel):
     receipt_id: str
     request_id: str
     workflow_id: str
-    outcome: Outcome
+    requested_action: str
+    outcome: Outcome | str
     protected_effect_status: str
     no_bind_status: bool
     reason_codes: List[str]
     replay_token: str
     public_hash: str
     notice: str
+    request_snapshot_hash: str | None = None
+    evidence_manifest_hash: str | None = None
+    signature_algorithm: str = "hmac-sha256"
+    signature_key_id: str = "development-receipt-key"
+    signature: str | None = None

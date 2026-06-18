@@ -13,6 +13,7 @@ DEFAULT_SECRET_VALUES = {
     "default",
     "secret",
     "replace_with_32_plus_character_random_secret",
+    "development-receipt-secret-not-for-production",
 }
 
 
@@ -72,6 +73,9 @@ def validate_production_settings() -> None:
 
     if not valid_auth_secret(os.getenv("AUTH_TOKEN_SECRET")):
         issues.append("AUTH_TOKEN_SECRET must be set to a non-default value of at least 32 characters")
+
+    if not valid_auth_secret(os.getenv("RECEIPT_SIGNING_SECRET")):
+        issues.append("RECEIPT_SIGNING_SECRET must be set to a non-default value of at least 32 characters")
 
     if not cors_origins:
         issues.append("CORS_ALLOW_ORIGINS must be explicit")
