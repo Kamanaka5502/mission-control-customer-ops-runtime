@@ -50,17 +50,21 @@ def build_request_snapshot(operation: OperationRequest) -> dict[str, Any]:
 
 
 def build_evidence_manifest(evidence_items: list[EvidenceItem]) -> dict[str, Any]:
-    items = [
-        {
-            "id": evidence.id,
-            "request_id": evidence.request_id,
-            "label": evidence.label,
-            "source": evidence.source,
-            "freshness_status": evidence.freshness_status,
-            "payload": evidence.payload or {},
-        }
-        for evidence in sorted(evidence_items, key=lambda item: item.id)
-    ]
+    items = []
+    for evidence in sorted(evidence_items, key=lambda item: item.id):
+        payload = evidence.payload or {}
+        items.append(
+            {
+                "id": evidence.id,
+                "request_id": evidence.request_id,
+                "label": evidence.label,
+                "source": evidence.source,
+                "freshness_status": evidence.freshness_status,
+                "payload_hash": stable_hash(payload),
+                "payload_redacted": True,
+            }
+        )
+
     manifest = {
         "manifest_version": EVIDENCE_MANIFEST_VERSION,
         "evidence_count": len(items),
