@@ -1,5 +1,4 @@
 import os
-from dataclasses import dataclass
 from urllib.parse import urlparse
 
 from app.services.key_management import validate_key_settings
@@ -9,12 +8,10 @@ TRUE_VALUES = {"1", "true", "yes", "on"}
 LOCAL_CORS_HOSTS = {"localhost", "127.0.0.1", "0.0.0.0", "::1"}
 
 
-@dataclass(frozen=True)
 class ProductionSettingsError(RuntimeError):
-    issues: tuple[str, ...]
-
-    def __str__(self) -> str:
-        return "Unsafe production settings: " + "; ".join(self.issues)
+    def __init__(self, issues: tuple[str, ...]):
+        self.issues = issues
+        super().__init__("Unsafe production settings: " + "; ".join(self.issues))
 
 
 def enabled(value: str | None) -> bool:
