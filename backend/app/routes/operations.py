@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
@@ -13,6 +15,8 @@ from app.services.receipt import build_receipt
 from app.services.tenant_guard import get_request_for_tenant, get_tenant_id, get_workflow_for_tenant, require_tenant_access
 
 router = APIRouter()
+
+EXECUTION_CONTROL_KEY = "execution_control"
 
 
 def operation_to_customer_request(operation: OperationRequest) -> CustomerRequest:
@@ -39,6 +43,68 @@ def actor_name(actor: Actor) -> str:
 def _latest_integrity_event(events: list[AuditEvent], event_type: str) -> AuditEvent | None:
     matching = [event for event in events if event.event_type == event_type]
     return matching[-1] if matching else None
+
+
+def _utc_now() -> str:
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+
+
+def _stored_execution_result(operation: OperationRequest) -> dict | None:
+    control = (operation.request_metadata or {}).get(EXECUTION_CONTROL_KEY)
+    if not isinstance(control, dict):
+        return None
+    result = control.get("result")
+    return result if isinstance(result, dict) else None
+
+
+def _store_execution_result(operation: OperationRequest, result: dict) -> None:
+    metadata = dict(operation.request_metadata or {})
+    metadata[EXECUTION_CONTROL_KEY] = {
+        "result": {**result, "idempotent_replay": False},
+        "completed_at": _utc_now(),
+    }
+    operation.request_metadata = metadata
+
+
+def _execution_result(operation: OperationRequest, decision: Decision, *, idempotent_replay: bool) -> dict:
+    return {
+        "request_id": operation.id,
+        "execution_status": "EXECUTED",
+        "requested_action": operation.requested_action,
+        "lifecycle_status": "executed",
+        "decision_outcome": decision.outcome,
+        "receipt_id": decision.receipt_id,
+        "idempotent_replay": idempotent_replay,
+    }
+
+
+def _final_execution_error(operation: OperationRequest, decision: Decision) -> str | None:
+    if decision.outcome == "REFUSE":
+        return "Closed request is not releasable."
+
+    allowed_statuses = {"ready_to_execute", "approved_for_execution"}
+    if operation.lifecycle_status not in allowed_statuses:
+        return "Request is not in an executable lifecycle state."
+
+    if decision.outcome == "HOLD":
+        return "Held request is not executable."
+
+    if decision.outcome in {"ESCALATE", "HOLD"} and operation.lifecycle_status != "approved_for_execution":
+        return "Request requires approval before execution."
+
+    if decision.outcome != "ADMIT" and operation.lifecycle_status != "approved_for_execution":
+        return "Runtime decision is not executable without review approval."
+
+    req_model = operation_to_customer_request(operation)
+    current_outcome, current_effect_status, current_no_bind, _ = evaluate_request(req_model)
+    if current_outcome.value != decision.outcome:
+        return "Current runtime decision no longer matches stored decision."
+    if current_effect_status != decision.protected_effect_status:
+        return "Current protected-effect status no longer matches stored decision."
+    if current_no_bind != decision.no_bind_status:
+        return "Current no-bind status no longer matches stored decision."
+
+    return None
 
 
 @router.post("/requests/evaluate", response_model=RuntimeDecision)
@@ -161,28 +227,28 @@ def execute_request(
     if not decision:
         raise HTTPException(status_code=404, detail="Decision not found")
 
-    if decision.outcome == "REFUSE":
-        record_event(db, request_id, "execution_blocked", actor=actor_name(actor), detail={"status": operation.lifecycle_status, "outcome": decision.outcome})
-        raise HTTPException(status_code=409, detail={"execution_status": "BLOCKED", "reason": "Closed request is not releasable."})
+    stored_result = _stored_execution_result(operation)
+    if operation.lifecycle_status == "executed" and stored_result:
+        replay_result = {**stored_result, "idempotent_replay": True}
+        record_event(db, request_id, "execution_idempotent_replay", actor=actor_name(actor), detail={"receipt_id": decision.receipt_id})
+        return replay_result
 
-    allowed_statuses = {"ready_to_execute", "approved_for_execution"}
-    if operation.lifecycle_status not in allowed_statuses:
-        record_event(db, request_id, "execution_blocked", actor=actor_name(actor), detail={"status": operation.lifecycle_status, "outcome": decision.outcome})
-        raise HTTPException(status_code=409, detail={"execution_status": "BLOCKED", "reason": "Request is not in an executable lifecycle state."})
+    if operation.lifecycle_status == "executed":
+        replay_result = _execution_result(operation, decision, idempotent_replay=True)
+        record_event(db, request_id, "execution_idempotent_replay", actor=actor_name(actor), detail={"receipt_id": decision.receipt_id})
+        return replay_result
 
-    if decision.outcome != "ADMIT" and operation.lifecycle_status != "approved_for_execution":
-        record_event(db, request_id, "execution_blocked", actor=actor_name(actor), detail={"status": operation.lifecycle_status, "outcome": decision.outcome})
-        raise HTTPException(status_code=409, detail={"execution_status": "BLOCKED", "reason": "Runtime decision is not executable without review approval."})
+    final_error = _final_execution_error(operation, decision)
+    if final_error:
+        record_event(db, request_id, "execution_blocked", actor=actor_name(actor), detail={"status": operation.lifecycle_status, "outcome": decision.outcome, "reason": final_error})
+        raise HTTPException(status_code=409, detail={"execution_status": "BLOCKED", "reason": final_error})
 
+    result = _execution_result(operation, decision, idempotent_replay=False)
     operation.lifecycle_status = "executed"
+    _store_execution_result(operation, result)
     db.commit()
-    record_event(db, request_id, "execution_completed", actor=actor_name(actor), detail={"requested_action": operation.requested_action})
-    return {
-        "request_id": request_id,
-        "execution_status": "EXECUTED",
-        "requested_action": operation.requested_action,
-        "lifecycle_status": operation.lifecycle_status,
-    }
+    record_event(db, request_id, "execution_completed", actor=actor_name(actor), detail={"requested_action": operation.requested_action, "receipt_id": decision.receipt_id})
+    return result
 
 
 @router.get("/requests/{request_id}/receipt")
