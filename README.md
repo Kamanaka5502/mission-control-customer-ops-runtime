@@ -67,7 +67,7 @@ This repo includes an end-to-end runtime with:
 - FastAPI backend
 - SQLAlchemy persistence
 - SQLite default database for local development
-- PostgreSQL-ready production path
+- PostgreSQL production path tested in CI
 - customer and workflow APIs
 - request evaluation API
 - evidence attachment API
@@ -79,6 +79,7 @@ This repo includes an end-to-end runtime with:
 - audit ledger verification endpoint
 - signed proof bundle export and verification endpoints
 - metrics endpoint
+- monitoring profile endpoint
 - correlation ID middleware
 - API body-size controls
 - API rate-limit controls
@@ -89,7 +90,7 @@ This repo includes an end-to-end runtime with:
 - trusted-ingress requirement in production mode
 - tenant-header requirement in production mode
 - schema versioning and Alembic migrations
-- GitHub Actions CI
+- GitHub Actions CI with SQLite and PostgreSQL backend coverage
 - CodeQL workflow
 - smoke test script
 - local demo walkthrough script
@@ -99,11 +100,11 @@ This repo includes an end-to-end runtime with:
 
 ```text
 Backend: FastAPI, Python 3.11, Pydantic
-Persistence: SQLAlchemy, SQLite local development, PostgreSQL-ready production path
+Persistence: SQLAlchemy, SQLite local development, PostgreSQL production path tested in CI
 Frontend: Next.js, React, TypeScript
 Deployment: Docker, Docker Compose
-Testing: pytest, FastAPI TestClient, smoke test script, local walkthrough script
-Operations: CORS, correlation IDs, structured request logging, metrics endpoint, API boundary controls
+Testing: pytest, FastAPI TestClient, smoke test script, local walkthrough script, SQLite CI, PostgreSQL CI
+Operations: CORS, correlation IDs, structured request logging, metrics endpoint, monitoring profile, API boundary controls
 ```
 
 ## Architecture
@@ -127,7 +128,7 @@ FastAPI Operations API
     +--> Replay Service
     +--> Audit Trail + Ledger Verification
     +--> Proof Bundle Store
-    +--> Metrics + Dashboard
+    +--> Metrics + Monitoring + Dashboard
     |
     v
 SQLAlchemy Persistence Layer
@@ -149,6 +150,7 @@ customer
   -> changed-condition replay
   -> audit ledger verification
   -> proof bundle verification
+  -> monitoring profile
   -> dashboard
 ```
 
@@ -196,7 +198,8 @@ Customer requests a time-bound operational exception.
 11. Changed-condition replay refuses inherited authorization posture
 12. Audit ledger verifies
 13. Proof bundle verifies
-14. Dashboard summarizes runtime state
+14. Monitoring profile summarizes operational state
+15. Dashboard summarizes runtime state
 ```
 
 ## What this system does
@@ -213,7 +216,8 @@ Customer requests a time-bound operational exception.
 10. Audit trail records material events.
 11. Audit ledger verification checks event linkage.
 12. Proof bundle export ties request, evidence, decision, receipt, replay, and audit artifacts together.
-13. Dashboard exposes operational state.
+13. Monitoring profile exposes operational state and incident handoff fields.
+14. Dashboard exposes operational state.
 
 ## Example use cases
 
@@ -260,6 +264,7 @@ Frontend: http://localhost:3000
 API docs: http://localhost:8000/docs
 Health: http://localhost:8000/health
 Metrics: http://localhost:8000/metrics
+Monitoring: http://localhost:8000/ops/monitoring
 ```
 
 Run the scripted local walkthrough:
@@ -336,12 +341,12 @@ Implemented controls include:
 - Proof bundles are signed and verifiable.
 - API body-size and rate controls protect the API boundary.
 - Runtime signing keys support current and verify-only previous values.
+- Monitoring profile exposes operational probes, counters, alerts, and incident handoff fields.
+- PostgreSQL migrations and backend tests run in CI.
 
 Remaining production-readiness work includes:
 
 - distributed limiter or gateway enforcement for multi-instance deployments
-- PostgreSQL CI coverage
-- monitoring procedures
 - customer deployment approval and external review
 
 ## Core outcomes
@@ -375,7 +380,6 @@ python scripts/check_deployment_readiness.py --strict
 - policy packs per customer or workflow type
 - deployment profiles for cloud environments
 - distributed proof store
-- production monitoring profile
 
 ## Key docs
 
@@ -390,6 +394,9 @@ python scripts/check_deployment_readiness.py --strict
 - `docs/audit-ledger.md`
 - `docs/persistent-proof-store.md`
 - `docs/key-management.md`
+- `docs/monitoring-profile.md`
+- `docs/incident-response.md`
+- `docs/postgres-ci.md`
 - `docs/local-demo-walkthrough.md`
 - `docs/deployment-evidence-template.md`
 - `docs/release-checklist.md`
@@ -402,7 +409,6 @@ python scripts/check_deployment_readiness.py --strict
 
 The remaining production-readiness work is tracked in GitHub issue #27 and includes:
 
-- PostgreSQL production and CI path
-- monitoring profile
+- distributed limiter or gateway enforcement for multi-instance deployments
 - deployment certification gate
 - customer-approved storage, retention, and backup policy
