@@ -35,7 +35,15 @@ class Actor:
 
 
 TRUE_VALUES = {"1", "true", "yes", "on"}
-DEFAULT_SECRET_VALUES = {"", "change-me", "changeme", "dev-secret", "default", "secret"}
+DEFAULT_SECRET_VALUES = {
+    "",
+    "change-me",
+    "changeme",
+    "dev-secret",
+    "default",
+    "secret",
+    "replace_with_32_plus_character_random_secret",
+}
 
 PERMISSIONS_BY_ROLE: dict[Role, set[str]] = {
     Role.REQUESTER: {"request:create", "evidence:attach", "request:read", "dashboard:read"},
