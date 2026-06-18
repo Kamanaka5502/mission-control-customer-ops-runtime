@@ -13,6 +13,7 @@ WRITE_METHODS = {"POST", "PUT", "PATCH"}
 DEFAULT_BODY_LIMIT_BYTES = 256 * 1024
 DEFAULT_RATE_LIMIT_REQUESTS = 120
 DEFAULT_RATE_LIMIT_WINDOW_SECONDS = 60
+TRUE_VALUES = {"1", "true", "yes", "on"}
 
 
 @dataclass(frozen=True)
@@ -20,6 +21,7 @@ class ApiSecuritySettings:
     max_body_bytes: int = DEFAULT_BODY_LIMIT_BYTES
     rate_limit_requests: int = DEFAULT_RATE_LIMIT_REQUESTS
     rate_limit_window_seconds: int = DEFAULT_RATE_LIMIT_WINDOW_SECONDS
+    rate_limit_enabled: bool = False
 
 
 def _positive_int_env(name: str, default: int) -> int:
@@ -33,11 +35,23 @@ def _positive_int_env(name: str, default: int) -> int:
     return value if value > 0 else default
 
 
+def _enabled_env(name: str, default: bool = False) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in TRUE_VALUES
+
+
+def _production_mode() -> bool:
+    return os.getenv("APP_ENV", "development").strip().lower() in {"production", "prod"}
+
+
 def api_security_settings() -> ApiSecuritySettings:
     return ApiSecuritySettings(
         max_body_bytes=_positive_int_env("MAX_REQUEST_BODY_BYTES", DEFAULT_BODY_LIMIT_BYTES),
         rate_limit_requests=_positive_int_env("RATE_LIMIT_REQUESTS", DEFAULT_RATE_LIMIT_REQUESTS),
         rate_limit_window_seconds=_positive_int_env("RATE_LIMIT_WINDOW_SECONDS", DEFAULT_RATE_LIMIT_WINDOW_SECONDS),
+        rate_limit_enabled=_enabled_env("RATE_LIMIT_ENABLED", default=_production_mode()),
     )
 
 
@@ -76,11 +90,13 @@ class InMemoryRateLimitMiddleware(BaseHTTPMiddleware):
         *,
         limit: int | None = None,
         window_seconds: int | None = None,
+        enabled: bool | None = None,
     ):
         super().__init__(app)
         settings = api_security_settings()
         self.limit = limit or settings.rate_limit_requests
         self.window_seconds = window_seconds or settings.rate_limit_window_seconds
+        self.enabled = settings.rate_limit_enabled if enabled is None else enabled
         self._hits: dict[str, Deque[float]] = defaultdict(deque)
 
     def _client_key(self, request: Request) -> str:
@@ -92,6 +108,12 @@ class InMemoryRateLimitMiddleware(BaseHTTPMiddleware):
         return "unknown-client"
 
     async def dispatch(self, request: Request, call_next):
+        if not self.enabled:
+            response = await call_next(request)
+            response.headers["x-rate-limit-enabled"] = "false"
+            response.headers["x-request-body-limit-bytes"] = str(api_security_settings().max_body_bytes)
+            return response
+
         key = self._client_key(request)
         now = time.monotonic()
         cutoff = now - self.window_seconds
@@ -110,11 +132,12 @@ class InMemoryRateLimitMiddleware(BaseHTTPMiddleware):
                     "rate_limit_requests": self.limit,
                     "rate_limit_window_seconds": self.window_seconds,
                 },
-                headers={"Retry-After": str(retry_after)},
+                headers={"Retry-After": str(retry_after), "x-rate-limit-enabled": "true"},
             )
 
         hits.append(now)
         response = await call_next(request)
+        response.headers["x-rate-limit-enabled"] = "true"
         response.headers["x-rate-limit-limit"] = str(self.limit)
         response.headers["x-rate-limit-window-seconds"] = str(self.window_seconds)
         response.headers["x-request-body-limit-bytes"] = str(api_security_settings().max_body_bytes)
