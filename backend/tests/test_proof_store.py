@@ -1,8 +1,10 @@
 from uuid import uuid4
 
+import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
+from app.services.proof_store import proof_bundle_path
 
 client = TestClient(app)
 
@@ -86,3 +88,9 @@ def test_proof_bundle_contains_required_artifacts(tmp_path, monkeypatch):
     assert "integrity" in bundle
     assert bundle["receipt"]["request_snapshot_hash"] == bundle["request_snapshot"]["snapshot_hash"]
     assert bundle["receipt"]["evidence_manifest_hash"] == bundle["evidence_manifest"]["manifest_hash"]
+
+
+@pytest.mark.parametrize("request_id", ["../escape", "nested/path", "bad\\path", "bad path"])
+def test_proof_bundle_path_rejects_unsafe_request_ids(tmp_path, request_id):
+    with pytest.raises(ValueError):
+        proof_bundle_path(request_id, base_dir=tmp_path)
