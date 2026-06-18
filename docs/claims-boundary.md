@@ -56,7 +56,7 @@ Mission Control should only be described as a production-candidate runtime when 
 
 Mission Control must not claim:
 
-- production certification before audit, customer approval, or equivalent written review
+- production certification before customer security approval, external audit, or equivalent written deployment authorization for the specific deployment scope
 - legal, medical, financial, or regulated authority
 - customer deployment readiness without written scope and deployment evidence
 - implementation of unfinished roadmap items
