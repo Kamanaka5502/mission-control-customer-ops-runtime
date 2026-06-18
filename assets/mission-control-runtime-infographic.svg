@@ -56,7 +56,6 @@
   <text x="800" y="100" text-anchor="middle" class="subtitle">End-to-End Operational Request Lifecycle</text>
   <line x1="0" y1="116" x2="1600" y2="116" stroke="#1b75bb" stroke-width="2" opacity="0.55"/>
 
-  <!-- Step headings -->
   <text x="96" y="150" class="step">1. INTAKE JSON</text>
   <text x="360" y="150" class="step">2. OPERATIONAL</text><text x="376" y="173" class="step">POLICY GATE</text>
   <text x="585" y="150" class="step">3. ESCALATE</text>
@@ -65,7 +64,6 @@
   <text x="1220" y="150" class="step">6. CONTROLLED</text><text x="1236" y="173" class="step">RELEASE</text>
   <text x="1410" y="150" class="step">7. PERSISTED</text><text x="1426" y="173" class="step">RECEIPT</text>
 
-  <!-- Intake JSON -->
   <rect class="panel" x="38" y="160" width="285" height="390" rx="9"/>
   <text class="mono" x="55" y="184">{</text>
   <text class="mono" x="70" y="205">"customers": {</text>
@@ -89,7 +87,6 @@
   <text class="mono" x="70" y="547">]</text>
   <text class="mono" x="55" y="566">}</text>
 
-  <!-- arrows -->
   <polygon class="arrow" points="325,246 360,246 360,225 392,270 360,315 360,294 325,294"/>
   <polygon class="arrow" points="500,246 535,246 535,225 567,270 535,315 535,294 500,294"/>
   <polygon class="arrow" points="715,246 760,246 760,225 792,270 760,315 760,294 715,294"/>
@@ -97,7 +94,6 @@
   <polygon class="arrow" points="1165,246 1202,246 1202,225 1234,270 1202,315 1202,294 1165,294"/>
   <polygon class="arrow" points="1324,246 1360,246 1360,225 1392,270 1360,315 1360,294 1324,294"/>
 
-  <!-- Policy gate gauge -->
   <circle cx="435" cy="250" r="62" fill="#071426" stroke="#dbeafe" stroke-width="4" filter="url(#shadow)"/>
   <path d="M389 250 A46 46 0 0 1 415 208" stroke="#3b82f6" stroke-width="14" fill="none"/>
   <path d="M415 208 A46 46 0 0 1 462 210" stroke="#22c55e" stroke-width="14" fill="none"/>
@@ -115,7 +111,6 @@
   <text x="433" y="512" text-anchor="middle" class="label yellowText">ESCALATE</text>
   <text x="433" y="538" text-anchor="middle" class="small">PENDING REVIEW</text>
 
-  <!-- Escalate -->
   <rect x="568" y="190" width="155" height="110" rx="10" fill="#3a1010" stroke="#ef4444" stroke-width="2" filter="url(#shadow)"/>
   <polygon points="646,210 690,280 602,280" fill="#b91c1c" stroke="#fecaca" stroke-width="5"/>
   <line x1="646" y1="232" x2="646" y2="256" stroke="#fff" stroke-width="8" stroke-linecap="round"/>
@@ -128,7 +123,6 @@
   <text x="648" y="456" text-anchor="middle" class="redText" font-size="23" font-family="Arial" font-weight="800">PENDING</text>
   <text x="648" y="482" text-anchor="middle" class="small">HIGH_AUTHORITY_REVIEW</text>
 
-  <!-- Reviewer -->
   <circle cx="862" cy="250" r="58" fill="#1f123a" stroke="#a855f7" stroke-width="3" filter="url(#shadow)"/>
   <circle cx="862" cy="226" r="15" fill="#a855f7"/>
   <path d="M830 279 C835 255 850 244 862 244 C878 244 895 257 898 279 Z" fill="#a855f7"/>
@@ -141,24 +135,22 @@
   <text x="846" y="468" text-anchor="middle" class="label">APPROVE</text>
   <path d="M904 462 l13 13 l26 -31" stroke="#f8fafc" stroke-width="5" fill="none" stroke-linecap="round"/>
 
-  <!-- Shield approved -->
   <path d="M1080 196 L1125 216 L1125 270 C1120 310 1100 333 1080 345 C1060 333 1040 310 1035 270 L1035 216 Z" fill="url(#green)" stroke="#98f28a" stroke-width="4" filter="url(#shadow)"/>
   <path d="M1058 265 l22 22 l45 -54" stroke="#eaffea" stroke-width="9" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
   <text x="1080" y="332" text-anchor="middle" class="body">Request Approved</text>
   <text x="1080" y="353" text-anchor="middle" class="body">for Controlled</text>
   <text x="1080" y="374" text-anchor="middle" class="body">Execution</text>
   <rect x="992" y="402" width="178" height="96" rx="9" fill="#07351b" stroke="#22c55e" stroke-width="2"/>
-  <text x="1081" y="429" text-anchor="middle" class="body">DECISION:</text>
-  <text x="1081" y="460" text-anchor="middle" class="greenText" font-size="23" font-family="Arial">ADMIT</text>
-  <text x="1081" y="482" text-anchor="middle" class="small">AUTHORIZED_TO_PROCEED</text>
+  <text x="1081" y="429" text-anchor="middle" class="body">LIFECYCLE:</text>
+  <text x="1081" y="460" text-anchor="middle" class="greenText" font-size="23" font-family="Arial">APPROVED</text>
+  <text x="1081" y="482" text-anchor="middle" class="small">APPROVED_FOR_EXECUTION</text>
 
-  <!-- Lock release -->
   <rect x="1210" y="196" width="96" height="106" rx="10" fill="#251807" stroke="#fbbf24" stroke-width="3" filter="url(#shadow)"/>
   <rect x="1232" y="237" width="54" height="43" rx="6" fill="#fbbf24"/>
   <path d="M1242 237 V221 C1242 203 1276 203 1276 221 V237" stroke="#fbbf24" stroke-width="9" fill="none"/>
   <circle cx="1259" cy="257" r="7" fill="#111827"/><rect x="1256" y="257" width="6" height="16" fill="#111827"/>
   <text x="1258" y="332" text-anchor="middle" class="body">Execution Guard</text>
-  <text x="1258" y="353" text-anchor="middle" class="body">Validates Decision</text>
+  <text x="1258" y="353" text-anchor="middle" class="body">Re-checks Boundary</text>
   <text x="1258" y="374" text-anchor="middle" class="body">and Protects Resources</text>
   <rect x="1184" y="402" width="150" height="110" rx="9" fill="#1f1607" stroke="#fbbf24" stroke-width="2"/>
   <text x="1259" y="429" text-anchor="middle" class="body">STATUS:</text>
@@ -166,13 +158,12 @@
   <text x="1259" y="482" text-anchor="middle" class="small yellowText">PROTECTED EFFECT</text>
   <text x="1259" y="501" text-anchor="middle" class="small yellowText">AUTHORIZED</text>
 
-  <!-- Receipt -->
   <path d="M1360 185 L1550 185 L1550 625 C1530 615 1515 635 1494 625 C1473 615 1458 635 1437 625 C1416 615 1401 635 1380 625 C1368 619 1360 623 1360 623 Z" fill="#f8fafc" stroke="#e5e7eb" stroke-width="2" filter="url(#shadow)"/>
   <text x="1376" y="216" fill="#0b3b80" font-size="16" font-family="Arial" font-weight="800">MISSION CONTROL RECEIPT</text>
   <text x="1376" y="254" fill="#111827" font-size="13" font-family="Arial" font-weight="700">Receipt ID:</text><text x="1376" y="272" fill="#111827" font-size="13" font-family="Arial">receipt-REQ-PROD-001</text>
   <text x="1376" y="306" fill="#111827" font-size="13" font-family="Arial" font-weight="700">Request ID:</text><text x="1376" y="324" fill="#111827" font-size="13" font-family="Arial">INC-1042</text>
-  <text x="1376" y="358" fill="#111827" font-size="13" font-family="Arial" font-weight="700">Decision:</text><text x="1376" y="376" fill="#111827" font-size="13" font-family="Arial">ADMIT</text>
-  <text x="1376" y="410" fill="#111827" font-size="13" font-family="Arial" font-weight="700">Protected Effect Status:</text><text x="1376" y="428" fill="#111827" font-size="13" font-family="Arial">AUTHORIZED_TO_PROCEED</text>
+  <text x="1376" y="358" fill="#111827" font-size="13" font-family="Arial" font-weight="700">Decision:</text><text x="1376" y="376" fill="#111827" font-size="13" font-family="Arial">ESCALATE</text>
+  <text x="1376" y="410" fill="#111827" font-size="13" font-family="Arial" font-weight="700">Protected Effect Status:</text><text x="1376" y="428" fill="#111827" font-size="13" font-family="Arial">PENDING_HIGH_AUTHORITY_REVIEW</text>
   <text x="1376" y="462" fill="#111827" font-size="13" font-family="Arial" font-weight="700">Replay Token:</text><text x="1376" y="480" fill="#111827" font-size="13" font-family="Arial">replay-prod-001</text>
   <text x="1376" y="514" fill="#111827" font-size="13" font-family="Arial" font-weight="700">Timestamp:</text><text x="1376" y="532" fill="#111827" font-size="13" font-family="Arial">2026-05-23T13:20:50Z</text>
   <circle cx="1530" cy="252" r="19" fill="#1f7a34"/><path d="M1520 250 l8 8 l17 -22" stroke="#f8fafc" stroke-width="5" fill="none" stroke-linecap="round"/>
@@ -180,13 +171,12 @@
   <text x="1410" y="578" fill="#166534" font-size="13" font-family="Arial">Deterministic replay</text>
   <text x="1410" y="596" fill="#166534" font-size="13" font-family="Arial">verification available</text>
 
-  <!-- Replay verification -->
   <rect class="thinPanel" x="555" y="530" width="610" height="165" rx="10"/>
   <text x="860" y="555" text-anchor="middle" class="label">8. REPLAY VERIFICATION (DETERMINISTIC)</text>
   <rect x="570" y="568" width="275" height="110" rx="8" fill="#06182b" stroke="#124f83"/>
   <text x="645" y="594" class="blueText" font-size="14" font-family="Arial">SAME-CONDITION REPLAY</text>
   <text x="645" y="624" class="small">Re-execute with identical inputs</text>
-  <text x="645" y="654" class="small">Result: </text><text x="696" y="654" class="greenText" font-size="14" font-family="Arial">ADMIT</text>
+  <text x="645" y="654" class="small">Result: </text><text x="696" y="654" class="yellowText" font-size="14" font-family="Arial">ESCALATE</text>
   <path d="M604 607 a24 24 0 1 1 -2 39" stroke="#bde7ff" stroke-width="6" fill="none"/><polygon points="590,646 612,647 602,667" fill="#bde7ff"/>
   <rect x="848" y="568" width="300" height="110" rx="8" fill="#06182b" stroke="#124f83"/>
   <text x="932" y="594" class="yellowText" font-size="14" font-family="Arial">CHANGED-CONDITION REPLAY</text>
@@ -195,7 +185,6 @@
   <path d="M890 607 a24 24 0 1 0 2 39" stroke="#f8fafc" stroke-width="6" fill="none"/><polygon points="904,646 882,647 892,667" fill="#f8fafc"/>
   <polygon points="908,620 925,650 891,650" fill="#ef4444"/><text x="908" y="643" text-anchor="middle" fill="#fff" font-size="20" font-family="Arial" font-weight="800">!</text>
 
-  <!-- bottom panels -->
   <rect class="panel" x="20" y="710" width="380" height="295" rx="10"/>
   <text x="50" y="742" class="label">KEY SYSTEM PROPERTIES</text>
   <circle cx="70" cy="785" r="18" fill="#0b3158" stroke="#7dd3fc"/><text x="102" y="790" class="blueText" font-size="17" font-family="Arial">Immutable Audit Trail</text><text x="102" y="812" class="small">Every action is recorded and traceable.</text>
@@ -212,7 +201,7 @@
     <text x="440" y="838">13:18:21</text><text x="590" y="838">Policy Evaluation</text><text x="720" y="838">policy_engine</text><text x="820" y="838" class="yellowText">ESCALATE</text>
     <text x="440" y="868">13:19:02</text><text x="590" y="868">Escalated</text><text x="720" y="868">system</text><text x="820" y="868" class="redText">PENDING</text>
     <text x="440" y="898">13:19:45</text><text x="590" y="898">Review Approved</text><text x="720" y="898">reviewer_sam</text><text x="820" y="898" class="purpleText">APPROVE</text>
-    <text x="440" y="928">13:20:15</text><text x="590" y="928">Execution Authorized</text><text x="720" y="928">system</text><text x="820" y="928" class="greenText">ADMIT</text>
+    <text x="440" y="928">13:20:15</text><text x="590" y="928">Execution Released</text><text x="720" y="928">execution_guard</text><text x="820" y="928" class="yellowText">RELEASED</text>
     <text x="440" y="958">13:20:50</text><text x="590" y="958">Receipt Issued</text><text x="720" y="958">system</text><text x="820" y="958" class="blueText">RECEIPT</text>
   </g>
 
