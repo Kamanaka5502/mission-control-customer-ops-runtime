@@ -41,6 +41,7 @@ class Receipt(BaseModel):
     receipt_id: str
     request_id: str
     workflow_id: str
+    requested_action: str
     outcome: Outcome | str
     protected_effect_status: str
     no_bind_status: bool
