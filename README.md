@@ -1,8 +1,26 @@
 # Mission Control: Customer Operations Runtime
 
-A working customer operations platform for workflow intake, evidence collection, review orchestration, governed execution status, audit trails, receipts, replay, controlled execution, and operational observability.
+Mission Control is a production-candidate customer-operations runtime for controlled execution. It currently implements structured workflow intake, evidence-aware review, fail-closed execution gating, receipts, replay, audit trail, production boundary checks, and dashboard observability.
+
+The all-A production-candidate lane adds full authentication, RBAC, immutable snapshots, evidence integrity, signed receipts, external verification, tamper-evident audit, persistent proof storage, key management, and deployment certification gates. Those items are tracked as roadmap work until implemented, tested, and documented.
 
 This is built as a Forward Deployed Engineering portfolio system: a customer-facing application that turns ambiguous operational requests into structured, reviewable, executable workflows.
+
+## Claim boundary
+
+Mission Control is:
+
+- a customer-ops execution-control runtime
+- a buyer-demo and production-candidate operational boundary system
+- a runtime for intake, review, execution gating, receipts, replay, audit, and dashboard visibility
+- not the full dimensional Elyria / VERITA stack
+- not production certified until customer security approval, external audit, or equivalent written deployment authorization
+
+See:
+
+- `docs/claims-boundary.md`
+- `DEPLOYMENT_READINESS.md`
+- `docs/threat-model.md`
 
 ## Visual demo
 
@@ -35,11 +53,12 @@ Mission Control makes that boundary explicit:
 
 ## Current state
 
-This repo is no longer only a scaffold. It includes an end-to-end v0.4 runtime:
+This repo is no longer only a scaffold. It includes an end-to-end runtime with:
 
 - FastAPI backend
 - SQLAlchemy persistence
-- SQLite default database
+- SQLite default database for local development
+- PostgreSQL-ready production path
 - customer and workflow APIs
 - request evaluation API
 - evidence attachment API
@@ -53,7 +72,12 @@ This repo is no longer only a scaffold. It includes an end-to-end v0.4 runtime:
 - dashboard API
 - Next.js frontend dashboard
 - Docker Compose deployment
+- production configuration validation
+- trusted-ingress requirement in production mode
+- tenant-header requirement in production mode
+- schema versioning and Alembic migrations
 - GitHub Actions CI
+- CodeQL workflow
 - smoke test script
 - end-to-end API test
 
@@ -61,7 +85,7 @@ This repo is no longer only a scaffold. It includes an end-to-end v0.4 runtime:
 
 ```text
 Backend: FastAPI, Python 3.11, Pydantic
-Persistence: SQLAlchemy, SQLite default, PostgreSQL-ready path
+Persistence: SQLAlchemy, SQLite local development, PostgreSQL-ready production path
 Frontend: Next.js, React, TypeScript
 Deployment: Docker, Docker Compose
 Testing: pytest, FastAPI TestClient, smoke test script
@@ -215,6 +239,8 @@ Customer requests emergency access to a production system.
 - Customer discovery docs
 - Seeded demo cases
 - CI and tests
+- Deployment readiness package
+- Claims-boundary discipline
 
 ## Quickstart: Docker
 
@@ -294,23 +320,36 @@ NEXT_PUBLIC_API_BASE=http://127.0.0.1:8000
 
 ## Security and integrity posture
 
+Implemented controls include:
+
 - Every evaluated request produces a decision record.
 - Receipt payloads include stable hashes for replayable verification.
 - Same-condition replay verifies deterministic decision behavior.
 - Changed-condition replay proves prior authorization posture is not silently inherited.
 - Review actions are recorded in the audit trail.
 - Controlled execution is blocked unless lifecycle state permits release.
+- `REFUSE` blocks protected effect release.
 - Correlation IDs are returned on API responses for traceability.
 - Request logs include method, path, status, duration, and correlation ID.
+- Production mode requires trusted ingress.
+- Production mode requires an explicit tenant header.
+- Unsafe production configuration is rejected at startup.
 
-Planned hardening:
+All-A hardening still required:
 
+- real authentication
+- RBAC
 - immutable request snapshots
-- evidence hashing
-- role-based access control
+- evidence manifest integrity
 - signed receipts
-- tenant isolation
-- production PostgreSQL profile
+- external receipt verifier
+- tamper-evident audit ledger
+- persistent proof store
+- PostgreSQL CI coverage
+- API rate limiting and body limits
+- execution idempotency and final execution checks
+- key management and key rotation
+- monitoring and incident response procedures
 
 ## Core outcomes
 
@@ -318,6 +357,22 @@ Planned hardening:
 - `HOLD`: request needs more evidence, scope review, or correction.
 - `ESCALATE`: request requires higher authority or approval.
 - `REFUSE`: request cannot proceed and no protected effect is released.
+
+## Deployment readiness checker
+
+Run the readiness checker in report mode:
+
+```bash
+python scripts/check_deployment_readiness.py
+```
+
+Run it in strict mode when the all-A hardening package is expected to be complete:
+
+```bash
+python scripts/check_deployment_readiness.py --strict
+```
+
+The checker intentionally tracks missing all-A items until the implementation work is complete.
 
 ## Future extensions
 
@@ -341,7 +396,15 @@ Planned hardening:
 
 ## Key docs
 
+- `DEPLOYMENT_READINESS.md`
+- `docs/claims-boundary.md`
+- `docs/threat-model.md`
 - `docs/end-to-end-runbook.md`
+- `docs/operations-runbook.md`
+- `docs/schema-versioning.md`
+- `docs/trusted-ingress-identity.md`
+- `docs/deployment-evidence-template.md`
+- `docs/release-checklist.md`
 - `docs/customer-discovery.md`
 - `docs/architecture.md`
 - `docs/completeness-checklist.md`
@@ -349,13 +412,19 @@ Planned hardening:
 
 ## Production hardening roadmap
 
-- real authentication
-- role-based access control
-- PostgreSQL production profile
-- file upload-backed evidence storage
-- structured logging and request correlation IDs
-- metrics endpoint
-- multi-tenant isolation enforcement
-- deployment target docs
-- API versioning
-- frontend error-state polish
+The remaining all-A production-candidate work is tracked in GitHub issue #27 and includes:
+
+- authentication and protected routes
+- RBAC and endpoint-level permission matrix
+- full tenant isolation across runtime objects
+- immutable request snapshots
+- evidence integrity and manifest digesting
+- signed receipts and external verification
+- tamper-evident audit ledger
+- persistent proof store
+- PostgreSQL production and CI path
+- API hardening
+- execution safety
+- key management
+- monitoring and incident response
+- deployment certification gate
