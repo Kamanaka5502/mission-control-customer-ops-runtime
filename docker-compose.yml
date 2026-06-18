@@ -5,7 +5,7 @@ services:
       - "8000:8000"
     environment:
       - APP_MODE=customer-operations-platform
-      - DATABASE_URL=sqlite:///./mission_control.db
+      - DATABASE_URL=sqlite:////tmp/mission_control.db
 
   frontend:
     build: ./frontend
