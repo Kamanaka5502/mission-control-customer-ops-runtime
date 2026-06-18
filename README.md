@@ -6,9 +6,9 @@ This is built as a Forward Deployed Engineering portfolio system: a customer-fac
 
 ## Visual demo
 
-![Mission Control Customer Operations Runtime infographic](assets/mission-control-runtime-infographic.png)
+![Mission Control Customer Operations Runtime infographic](assets/mission-control-runtime-infographic.svg)
 
-A 20–40 second GIF should show:
+A 20-40 second GIF should show:
 
 ```text
 Dashboard -> request intake -> runtime decision -> review -> receipt -> replay -> audit trail
