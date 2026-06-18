@@ -1,5 +1,6 @@
 import json
 import os
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -15,15 +16,26 @@ from app.services.receipt import build_receipt, verify_receipt_signature
 
 PROOF_BUNDLE_VERSION = "proof-bundle-v1"
 DEFAULT_PROOF_STORE_DIR = "var/proof_store"
+SAFE_REQUEST_ID_PATTERN = re.compile(r"^[A-Za-z0-9_.:-]+$")
 
 
 def proof_store_dir() -> Path:
-    return Path(os.getenv("PROOF_STORE_PATH", DEFAULT_PROOF_STORE_DIR))
+    return Path(os.getenv("PROOF_STORE_PATH", DEFAULT_PROOF_STORE_DIR)).resolve()
+
+
+def safe_request_id(request_id: str) -> str:
+    if not SAFE_REQUEST_ID_PATTERN.fullmatch(request_id):
+        raise ValueError("request_id contains unsupported characters for proof-store paths")
+    return request_id
 
 
 def proof_bundle_path(request_id: str, *, base_dir: Path | None = None) -> Path:
-    root = base_dir or proof_store_dir()
-    return root / f"{request_id}.proof.json"
+    safe_id = safe_request_id(request_id)
+    root = (base_dir or proof_store_dir()).resolve()
+    path = (root / f"{safe_id}.proof.json").resolve()
+    if root != path and root not in path.parents:
+        raise ValueError("proof bundle path escapes proof-store directory")
+    return path
 
 
 def _utc_now() -> str:
