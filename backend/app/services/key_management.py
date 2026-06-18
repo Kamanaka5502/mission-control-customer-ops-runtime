@@ -53,15 +53,21 @@ def current_receipt_secret() -> str:
     return os.getenv("RECEIPT_SIGNING_SECRET", "development-receipt-secret-not-for-production")
 
 
-def previous_receipt_keys() -> dict[str, str]:
+def _previous_receipt_entries() -> list[tuple[str, str, str]]:
     raw = os.getenv("RECEIPT_SIGNING_PREVIOUS_KEYS", "")
-    keys: dict[str, str] = {}
+    entries: list[tuple[str, str, str]] = []
     for item in [part.strip() for part in raw.split(",") if part.strip()]:
         if ":" not in item:
+            entries.append((item, "", ""))
             continue
         key_id, secret = item.split(":", 1)
-        key_id = key_id.strip()
-        secret = secret.strip()
+        entries.append((item, key_id.strip(), secret.strip()))
+    return entries
+
+
+def previous_receipt_keys() -> dict[str, str]:
+    keys: dict[str, str] = {}
+    for _raw, key_id, secret in _previous_receipt_entries():
         if key_id and secret:
             keys[key_id] = secret
     return keys
@@ -101,18 +107,17 @@ def validate_key_settings() -> list[str]:
     if not is_safe_secret(receipt_current_secret):
         issues.append("RECEIPT_SIGNING_SECRET must be set to a non-default value of at least 32 characters")
 
-    previous_receipts = previous_receipt_keys()
-    for key_id, secret in previous_receipts.items():
+    seen_previous_key_ids: set[str] = set()
+    for raw_entry, key_id, secret in _previous_receipt_entries():
+        if not key_id or not secret:
+            issues.append(f"RECEIPT_SIGNING_PREVIOUS_KEYS entry {raw_entry} must use key_id:secret format with non-empty key id and secret")
+            continue
+        if key_id in seen_previous_key_ids:
+            issues.append(f"RECEIPT_SIGNING_PREVIOUS_KEYS entry {key_id} is duplicated")
+        seen_previous_key_ids.add(key_id)
         if key_id == receipt_current_key_id:
             issues.append(f"RECEIPT_SIGNING_PREVIOUS_KEYS entry {key_id} must not duplicate RECEIPT_SIGNING_KEY_ID")
         if not is_safe_secret(secret):
             issues.append(f"RECEIPT_SIGNING_PREVIOUS_KEYS entry {key_id} must use a non-default secret of at least 32 characters")
-        if secret == receipt_current_secret:
-            issues.append(f"RECEIPT_SIGNING_PREVIOUS_KEYS entry {key_id} must not duplicate RECEIPT_SIGNING_SECRET")
-
-    raw_previous_receipts = os.getenv("RECEIPT_SIGNING_PREVIOUS_KEYS", "")
-    malformed_receipt_entries = [entry.strip() for entry in raw_previous_receipts.split(",") if entry.strip() and ":" not in entry]
-    for entry in malformed_receipt_entries:
-        issues.append(f"RECEIPT_SIGNING_PREVIOUS_KEYS entry {entry} must use key_id:secret format")
 
     return issues
