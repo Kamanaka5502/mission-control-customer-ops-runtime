@@ -33,6 +33,9 @@ Use the production compose profile only with required environment variables supp
 
 ```bash
 POSTGRES_PASSWORD=<strong value> \
+AUTH_TOKEN_SECRET=<strong value> \
+RECEIPT_SIGNING_KEY_ID=<explicit key id> \
+RECEIPT_SIGNING_SECRET=<strong value> \
 NEXT_PUBLIC_API_BASE=https://api.example.com \
 CORS_ALLOW_ORIGINS=https://app.example.com \
 docker compose -f docker-compose.prod.yml up --build
@@ -47,6 +50,8 @@ The runtime intentionally fails closed when `APP_ENV=production` is set without 
 - `DATABASE_URL` must be present and must not use SQLite
 - `REQUIRE_TENANT_HEADER` must be enabled
 - `REQUIRE_TRUSTED_INGRESS` must be enabled
+- `AUTH_REQUIRED` must be enabled
+- auth and signing keys must be non-default
 - `CORS_ALLOW_ORIGINS` must be explicit and must not use localhost origins
 
 The production compose profile binds API and frontend ports to localhost, requires explicit CORS origins, runs service containers as non-root users, blocks privilege escalation, and uses read-only containers with temporary writable storage.
@@ -65,7 +70,7 @@ Runtime schema state is available at:
 GET /schema-version
 ```
 
-## Health checks
+## Health and monitoring checks
 
 Liveness:
 
@@ -79,7 +84,26 @@ Readiness:
 curl http://localhost:8000/ready
 ```
 
-`/health` confirms the service process is available. `/ready` confirms the application can reach its database.
+Monitoring profile:
+
+```bash
+curl http://localhost:8000/ops/monitoring
+```
+
+`/health` confirms the service process is available. `/ready` confirms the application can reach its database. `/ops/monitoring` returns runtime counts, alert checks, dependency probes, and incident handoff fields.
+
+## Incident response
+
+Use `docs/incident-response.md` for incident triage. Minimum evidence to preserve:
+
+- request id
+- correlation id
+- tenant id
+- actor id
+- timestamp
+- current monitoring profile response
+- audit events for affected requests
+- receipt and proof verification results
 
 ## Release checklist
 
@@ -96,4 +120,6 @@ Before external deployment, verify:
 - public traffic cannot directly set trusted identity headers
 - logs preserve correlation ids
 - closed/REFUSE requests cannot release protected action
+- monitoring profile returns expected shape
+- incident-response runbook is reviewed
 - dependency update alerts are enabled
