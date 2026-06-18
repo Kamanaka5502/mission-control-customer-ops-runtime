@@ -46,6 +46,22 @@ def create_request():
     return request_id
 
 
+def attach_evidence(request_id: str, payload: dict):
+    response = client.post(
+        "/ops/evidence",
+        json={
+            "id": f"evidence-{uuid4().hex[:8]}",
+            "request_id": request_id,
+            "label": "approval packet",
+            "source": "test-suite",
+            "freshness_status": "current",
+            "payload": payload,
+        },
+    )
+    assert response.status_code == 200
+    return response
+
+
 def test_request_snapshot_is_captured_and_verified():
     request_id = create_request()
 
@@ -62,19 +78,7 @@ def test_request_snapshot_is_captured_and_verified():
 
 def test_evidence_manifest_is_captured_after_evidence_attachment():
     request_id = create_request()
-
-    attached = client.post(
-        "/ops/evidence",
-        json={
-            "id": f"evidence-{uuid4().hex[:8]}",
-            "request_id": request_id,
-            "label": "approval packet",
-            "source": "test-suite",
-            "freshness_status": "current",
-            "payload": {"document": "approval", "version": 1},
-        },
-    )
-    assert attached.status_code == 200
+    attach_evidence(request_id, {"document": "approval", "version": 1})
 
     response = client.get(f"/ops/requests/{request_id}/integrity")
 
@@ -85,3 +89,22 @@ def test_evidence_manifest_is_captured_after_evidence_attachment():
     assert body["evidence_manifest"]["match"] is True
     assert body["evidence_manifest"]["evidence_count"] == 1
     assert body["integrity_status"] == "VERIFIED"
+
+
+def test_evidence_manifest_redacts_raw_payload_from_audit_detail():
+    request_id = create_request()
+    sensitive_payload = {"customer_secret": "do-not-expose", "document": "approval"}
+    attach_evidence(request_id, sensitive_payload)
+
+    audit = client.get(f"/ops/requests/{request_id}/audit")
+
+    assert audit.status_code == 200
+    manifest_events = [event for event in audit.json() if event["event_type"] == "evidence_manifest_captured"]
+    assert manifest_events
+    manifest_detail = manifest_events[-1]["detail"]
+    manifest_item = manifest_detail["manifest"]["items"][0]
+
+    assert manifest_item["payload_redacted"] is True
+    assert "payload_hash" in manifest_item
+    assert "payload" not in manifest_item
+    assert "do-not-expose" not in str(manifest_detail)
