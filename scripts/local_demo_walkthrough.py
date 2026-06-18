@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
-"""Run the local Mission Control demo walkthrough against a running API."""
+"""Run the local Mission Control demo walkthrough against the local API."""
 
 from __future__ import annotations
 
-import argparse
 import json
-import sys
 import time
 import urllib.error
 import urllib.request
 from datetime import datetime, timezone
 from typing import Any
+
+BASE_URL = "http://127.0.0.1:8000"
 
 
 def timestamp_suffix() -> str:
@@ -18,15 +18,12 @@ def timestamp_suffix() -> str:
 
 
 class DemoClient:
-    def __init__(self, base_url: str):
-        self.base_url = base_url.rstrip("/")
-
     def request(self, method: str, path: str, payload: dict[str, Any] | None = None) -> Any:
         data = None
         headers = {"Content-Type": "application/json", "x-correlation-id": f"demo-{timestamp_suffix()}"}
         if payload is not None:
             data = json.dumps(payload).encode("utf-8")
-        req = urllib.request.Request(f"{self.base_url}{path}", data=data, headers=headers, method=method)
+        req = urllib.request.Request(f"{BASE_URL}{path}", data=data, headers=headers, method=method)
         try:
             with urllib.request.urlopen(req, timeout=10) as res:
                 raw = res.read().decode("utf-8")
@@ -59,14 +56,10 @@ def print_step(number: int, title: str, payload: Any) -> None:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Run the Mission Control local demo walkthrough.")
-    parser.add_argument("--api", default="http://127.0.0.1:8000", help="Mission Control API base URL")
-    args = parser.parse_args()
-
-    client = DemoClient(args.api)
+    client = DemoClient()
     suffix = timestamp_suffix()
     customer_id = f"demo-customer-{suffix}"
-    workflow_id = f"security-exception-{suffix}"
+    workflow_id = f"operations-exception-{suffix}"
     request_id = f"REQ-DEMO-{suffix}"
 
     wait_for_api(client)
@@ -76,7 +69,7 @@ def main() -> int:
 
     workflow = client.post(
         "/ops/workflows",
-        {"id": workflow_id, "customer_id": customer_id, "name": "Security Exception", "description": "Emergency access review workflow"},
+        {"id": workflow_id, "customer_id": customer_id, "name": "Operations Exception", "description": "Controlled review workflow"},
     )
     print_step(2, "Workflow created", workflow)
 
@@ -86,15 +79,15 @@ def main() -> int:
             "customer_id": customer_id,
             "workflow_id": workflow_id,
             "request_id": request_id,
-            "requested_action": "grant_emergency_production_access",
-            "business_context": "On-call engineer needs temporary access to resolve an active incident.",
+            "requested_action": "approve_time_bound_operations_exception",
+            "business_context": "Operator requests a temporary exception for a defined workflow condition.",
             "authority_present": True,
             "scope_matched": True,
             "evidence_present": True,
             "evidence_fresh": True,
             "risk_level": "critical",
             "approval_required": True,
-            "metadata": {"incident_id": f"INC-{suffix}", "requested_duration_minutes": 30},
+            "metadata": {"case_id": f"CASE-{suffix}", "requested_duration_minutes": 30},
         },
     )
     print_step(3, "Request evaluated", decision)
@@ -104,10 +97,10 @@ def main() -> int:
         {
             "id": f"evidence-{request_id}",
             "request_id": request_id,
-            "label": "incident-ticket",
+            "label": "case-record",
             "source": "demo-runbook",
             "freshness_status": "fresh",
-            "payload": {"incident_id": f"INC-{suffix}", "approver_group": "production-operations"},
+            "payload": {"case_id": f"CASE-{suffix}", "review_group": "operations"},
         },
     )
     print_step(4, "Evidence attached", evidence)
@@ -122,7 +115,7 @@ def main() -> int:
     print_step(6, "Controlled execution released", execution)
 
     receipt = client.get(f"/ops/requests/{request_id}/receipt")
-    print_step(7, "Receipt generated", {"receipt_id": receipt.get("receipt_id"), "signature_valid": bool(receipt.get("signature"))})
+    print_step(7, "Receipt generated", {"receipt_id": receipt.get("receipt_id"), "signature_present": bool(receipt.get("signature"))})
 
     same_replay = client.post(f"/ops/requests/{request_id}/replay/same-condition")
     changed_replay = client.post(f"/ops/requests/{request_id}/replay/changed-condition")
