@@ -37,7 +37,7 @@ jobs:
           exit ${test_status}
       - name: Upload backend pytest log
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: backend-pytest-log
           path: /tmp/backend-pytest.log
@@ -86,7 +86,7 @@ jobs:
           exit ${test_status}
       - name: Upload PostgreSQL pytest log
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: backend-postgres-pytest-log
           path: /tmp/backend-postgres-pytest.log
