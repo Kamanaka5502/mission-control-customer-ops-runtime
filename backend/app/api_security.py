@@ -1,5 +1,6 @@
 import os
 import time
+from redis.asyncio import Redis
 from collections import defaultdict, deque
 from dataclasses import dataclass
 from typing import Any, Awaitable, Callable, Deque
@@ -24,6 +25,8 @@ class ApiSecuritySettings:
     rate_limit_requests: int = DEFAULT_RATE_LIMIT_REQUESTS
     rate_limit_window_seconds: int = DEFAULT_RATE_LIMIT_WINDOW_SECONDS
     rate_limit_enabled: bool = False
+    rate_limit_backend: str = "memory"
+    redis_url: str | None = None
     trusted_rate_limit_header: str = DEFAULT_TRUSTED_RATE_LIMIT_HEADER
 
 
@@ -55,6 +58,8 @@ def api_security_settings() -> ApiSecuritySettings:
         rate_limit_requests=_positive_int_env("RATE_LIMIT_REQUESTS", DEFAULT_RATE_LIMIT_REQUESTS),
         rate_limit_window_seconds=_positive_int_env("RATE_LIMIT_WINDOW_SECONDS", DEFAULT_RATE_LIMIT_WINDOW_SECONDS),
         rate_limit_enabled=_enabled_env("RATE_LIMIT_ENABLED", default=_production_mode()),
+        rate_limit_backend=os.getenv("RATE_LIMIT_BACKEND", "memory").strip().lower(),
+        redis_url=os.getenv("REDIS_URL"),
         trusted_rate_limit_header=os.getenv("TRUSTED_RATE_LIMIT_HEADER", DEFAULT_TRUSTED_RATE_LIMIT_HEADER).strip().lower() or DEFAULT_TRUSTED_RATE_LIMIT_HEADER,
     )
 
@@ -154,6 +159,12 @@ class InMemoryRateLimitMiddleware(BaseHTTPMiddleware):
         self.enabled = settings.rate_limit_enabled if enabled is None else enabled
         self.trusted_client_header = (trusted_client_header or settings.trusted_rate_limit_header).lower()
         self._hits: dict[str, Deque[float]] = defaultdict(deque)
+        self.rate_limit_backend = settings.rate_limit_backend
+        self.redis = None
+        if self.rate_limit_backend == "redis":
+            if not settings.redis_url:
+                raise RuntimeError("RATE_LIMIT_BACKEND=redis requires REDIS_URL.")
+            self.redis = Redis.from_url(settings.redis_url, decode_responses=True)
 
     def _client_key(self, request: Request) -> str:
         verified_ingress = request.headers.get("x-ingress-verified", "").strip().lower() == "true"
@@ -173,27 +184,51 @@ class InMemoryRateLimitMiddleware(BaseHTTPMiddleware):
             return response
 
         key = self._client_key(request)
-        now = time.monotonic()
-        cutoff = now - self.window_seconds
-        hits = self._hits[key]
+        if self.rate_limit_backend == "redis":
+            # Redis INCR + EXPIRE is shared across workers/instances. Use fixed
+            # windows to avoid process-local counters in production.
+            wall_now = int(time.time())
+            window_id = wall_now // self.window_seconds
+            redis_key = f"mission-control:rate-limit:{key}:{window_id}"
+            pipe = self.redis.pipeline()
+            pipe.incr(redis_key)
+            pipe.expire(redis_key, self.window_seconds + 1)
+            result = await pipe.execute()
+            count = int(result[0])
+            retry_after = max(1, self.window_seconds - (wall_now % self.window_seconds))
+            if count > self.limit:
+                return JSONResponse(
+                    status_code=429,
+                    content={
+                        "access": "DENIED",
+                        "reason": "Rate limit exceeded",
+                        "rate_limit_requests": self.limit,
+                        "rate_limit_window_seconds": self.window_seconds,
+                    },
+                    headers={"Retry-After": str(retry_after), "x-rate-limit-enabled": "true"},
+                )
+        else:
+            now = time.monotonic()
+            cutoff = now - self.window_seconds
+            hits = self._hits[key]
 
-        while hits and hits[0] <= cutoff:
-            hits.popleft()
+            while hits and hits[0] <= cutoff:
+                hits.popleft()
 
-        if len(hits) >= self.limit:
-            retry_after = max(1, int(self.window_seconds - (now - hits[0])))
-            return JSONResponse(
-                status_code=429,
-                content={
-                    "access": "DENIED",
-                    "reason": "Rate limit exceeded",
-                    "rate_limit_requests": self.limit,
-                    "rate_limit_window_seconds": self.window_seconds,
-                },
-                headers={"Retry-After": str(retry_after), "x-rate-limit-enabled": "true"},
-            )
+            if len(hits) >= self.limit:
+                retry_after = max(1, int(self.window_seconds - (now - hits[0])))
+                return JSONResponse(
+                    status_code=429,
+                    content={
+                        "access": "DENIED",
+                        "reason": "Rate limit exceeded",
+                        "rate_limit_requests": self.limit,
+                        "rate_limit_window_seconds": self.window_seconds,
+                    },
+                    headers={"Retry-After": str(retry_after), "x-rate-limit-enabled": "true"},
+                )
 
-        hits.append(now)
+            hits.append(now)
         response = await call_next(request)
         response.headers["x-rate-limit-enabled"] = "true"
         response.headers["x-rate-limit-limit"] = str(self.limit)
