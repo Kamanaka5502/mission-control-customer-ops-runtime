@@ -13,6 +13,9 @@ def set_base_production_env(monkeypatch):
     monkeypatch.setenv("RECEIPT_SIGNING_KEY_ID", "receipt-key-test")
     monkeypatch.setenv("RECEIPT_SIGNING_SECRET", "receipt-signing-secret-0123456789abcdef")
     monkeypatch.setenv("CORS_ALLOW_ORIGINS", "https://app.example.com")
+    monkeypatch.setenv("RATE_LIMIT_BACKEND", "redis")
+    monkeypatch.setenv("REDIS_URL", "redis://localhost:6379/0")
+    monkeypatch.setenv("RATE_LIMIT_ENABLED", "true")
 
 
 def test_production_settings_reject_sqlite(monkeypatch):
