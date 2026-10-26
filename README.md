@@ -412,3 +412,16 @@ The remaining production-readiness work is tracked in GitHub issue #27 and inclu
 - distributed limiter or gateway enforcement for multi-instance deployments
 - deployment certification gate
 - customer-approved storage, retention, and backup policy
+
+
+## Audit remediation: shared rate limiting and immutable receipts
+
+Production startup now requires all of the following:
+
+- `RATE_LIMIT_ENABLED=true`
+- `RATE_LIMIT_BACKEND=redis`
+- `REDIS_URL` pointing to a reachable shared Redis service
+
+The in-memory limiter remains available for local development/tests only; it is process-local and must not be treated as a distributed production control. The Redis backend uses shared fixed-window counters across application workers/instances. If Redis is unavailable, requests must not be allowed through an in-memory fallback.
+
+Newly evaluated requests persist the signed receipt snapshot in the request record. Receipt retrieval returns that original snapshot; legacy requests without a stored snapshot return HTTP 409 instead of silently minting a replacement receipt. These changes still require CI and deployment validation before production use.
