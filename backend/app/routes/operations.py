@@ -147,7 +147,7 @@ def create_and_evaluate_request(
         risk_level=payload.risk_level,
         approval_required=payload.approval_required,
         lifecycle_status=lifecycle_status,
-        request_metadata=payload.metadata,
+        request_metadata={**payload.metadata, "receipt_snapshot": receipt.model_dump(mode="json")},
     )
 
     decision = Decision(
@@ -265,16 +265,22 @@ def persisted_receipt(
     if not decision:
         raise HTTPException(status_code=404, detail="Decision not found")
 
-    req_model = operation_to_customer_request(operation)
-    receipt = build_receipt(
-        req_model,
-        decision.outcome,
-        decision.protected_effect_status,
-        decision.no_bind_status,
-        decision.reason_codes,
+    stored_receipt = (operation.request_metadata or {}).get("receipt_snapshot")
+    if not isinstance(stored_receipt, dict):
+        # Legacy records without an immutable snapshot cannot be represented as
+        # the original receipt. Fail closed rather than silently re-signing them.
+        raise HTTPException(
+            status_code=409,
+            detail="Immutable receipt snapshot is unavailable for this legacy request.",
+        )
+    record_event(
+        db,
+        request_id,
+        "receipt_viewed",
+        actor=actor_name(actor),
+        detail={"receipt_id": stored_receipt.get("receipt_id")},
     )
-    record_event(db, request_id, "receipt_viewed", actor=actor_name(actor), detail={"receipt_id": receipt.receipt_id})
-    return receipt
+    return stored_receipt
 
 
 @router.post("/requests/{request_id}/replay/same-condition")
