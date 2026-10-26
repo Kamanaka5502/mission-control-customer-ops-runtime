@@ -38,6 +38,12 @@ def validate_production_settings() -> None:
         return
 
     issues: list[str] = []
+    if os.getenv("RATE_LIMIT_BACKEND", "memory").strip().lower() != "redis":
+        issues.append("RATE_LIMIT_BACKEND=redis is required for shared rate limiting")
+    if not os.getenv("REDIS_URL", "").strip():
+        issues.append("REDIS_URL is required for shared rate limiting")
+    if not enabled(os.getenv("RATE_LIMIT_ENABLED")):
+        issues.append("RATE_LIMIT_ENABLED must be enabled")
     database_url = os.getenv("DATABASE_URL", "")
     cors_origins = configured_cors_origins()
 
