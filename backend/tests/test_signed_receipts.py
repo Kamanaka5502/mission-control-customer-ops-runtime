@@ -81,3 +81,23 @@ def test_missing_signed_boolean_field_fails_verification():
     assert result["valid"] is False
     assert result["reason"] == "missing_required_signed_fields"
     assert "no_bind_status" in result["missing_fields"]
+
+
+def test_receipt_endpoint_returns_original_persisted_snapshot():
+    request_id = create_request()
+    original = client.get(f"/ops/requests/{request_id}/receipt").json()
+
+    # Change the live request after evaluation. A receipt read must return the
+    # immutable receipt issued at evaluation time, not a newly reconstructed one.
+    from app.database import SessionLocal
+    from app.db_models import OperationRequest
+
+    with SessionLocal() as db:
+        operation = db.get(OperationRequest, request_id)
+        operation.requested_action = "changed-after-evaluation"
+        db.commit()
+
+    returned = client.get(f"/ops/requests/{request_id}/receipt")
+    assert returned.status_code == 200
+    assert returned.json() == original
+    assert returned.json()["requested_action"] == "approve_signed_action"
